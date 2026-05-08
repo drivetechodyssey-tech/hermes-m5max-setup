@@ -59,13 +59,13 @@ if [[ $TOTAL_RAM_GB -le 48 ]]; then
   warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32~48GB 기준)"
 
 elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
-      # 64GB: M2/M3/M4 Max
+       # 64GB: M5 Max
   PROFILE="max"
-  HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
+  HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
   HERMES_CTX=131072
-  BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
-  MCP_MODEL="qwen3.6:27b-coding-nvfp4"
-  FALLBACK_MODEL="llama-3.1-70b-instruct"
+  BACKUP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
+  MCP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
+  FALLBACK_MODEL="llama-3.3-70b-versatile"
   log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 64GB 기준, 약 83% 사용)"
 
 else

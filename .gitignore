@@ -1,0 +1,8 @@
+# API 키
+*.key
+.env
+secrets/
+!README.md
+
+# Hermes internal
+.hermes/

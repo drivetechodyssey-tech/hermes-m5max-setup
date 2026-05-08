@@ -35,67 +35,74 @@ CPU_MODEL=$(system_profiler SPHardwareDataType 2>/dev/null | grep "Chip" | sed '
 echo "  칩: $CPU_MODEL"
 echo "  메모리: ${TOTAL_RAM_GB}GB"
 
-# 메모리 기반 모델/컨텍스트tier 정의
+# 메모리 기반 모델/컨텍스트tier 정의 (2026-05-07 업데이트)
 # 기준: 모델 가중치 + KV 캐시 + 시스템(~10GB) + 여유 8~10GB
+# 사용자 테스트 결과 반영:
+#   16~24GB : 컨텍스트 65K, 가벼운 모델 (27b는 MLX 아님)
+#   32~40GB : 27b 4-bit (nvfp4), 컨텍스트 65K
+#   48GB    : 35b-a3b mxfp8, 컨텍스트 65K
+#   64GB    : 35b-a3b mxfp8, 컨텍스트 131K (약 83% 사용 — 충분)
+#   72~95GB : 35b-a3b mxfp8, 컨텍스트 131K
+#   96GB+   : 35b-a3b mxfp8, 컨텍스트 262K (최대)
 if [[ $TOTAL_RAM_GB -lt 28 ]]; then
-  # 16~24GB: M2/M3/M4 Pro
+   # 16~24GB: M2/M3/M4 Pro
   PROFILE="pro_small"
-  HERMES_MODEL="qwen3.6:27b"
+  HERMES_MODEL="qwen3:4b"
   HERMES_CTX=32768
-  BACKUP_MODEL="gemma4:26b"
-  MCP_MODEL="qwen3.6:27b"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
-  warn "소용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
+  BACKUP_MODEL="gemma3:4b"
+  MCP_MODEL="qwen3:4b"
+  FALLBACK_MODEL="llama-3.3-8b-instruct"
+  warn "소용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX}) — 27b는 MLX 양자화 없음"
 
 elif [[ $TOTAL_RAM_GB -lt 44 ]]; then
-  # 32~40GB: M3/M4 Pro
+   # 32~40GB: M3/M4 Pro
   PROFILE="pro"
-  HERMES_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
+  HERMES_MODEL="qwen3:27b"
   HERMES_CTX=65536
-  BACKUP_MODEL="gemma4:31b"
-  MCP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
-  warn "중용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
+  BACKUP_MODEL="gemma3:12b"
+  MCP_MODEL="qwen3:27b"
+  FALLBACK_MODEL="llama-3.1-70b-instruct"
+  warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX})"
 
 elif [[ $TOTAL_RAM_GB -lt 60 ]]; then
-  # 48GB: M4 Max
+   # 48GB: M4 Max
   PROFILE="max_small"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
   HERMES_CTX=65536
   BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
   MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
+  FALLBACK_MODEL="llama-3.1-70b-instruct"
   warn "대용량-small 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
 
 elif [[ $TOTAL_RAM_GB -lt 80 ]]; then
-  # 64GB: M2/M3/M4 Max (기본 프로필)
+   # 64GB: M2/M3/M4 Max
   PROFILE="max"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  HERMES_CTX=65536
+  HERMES_CTX=131072
   BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
   MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
-  log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
+  FALLBACK_MODEL="llama-3.1-70b-instruct"
+  log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX}) — 약 83% 메모리 사용"
 
 elif [[ $TOTAL_RAM_GB -lt 96 ]]; then
-  # 72~95GB: M2/M3/M4 Max 96GB (혹은 커스텀)
+   # 72~95GB: M2/M3/M4 Max 96GB
   PROFILE="max_large"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
   HERMES_CTX=131072
   BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
   MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
-  warn "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX}) — 높은 컨텍스트 설정"
+  FALLBACK_MODEL="llama-3.1-70b-instruct"
+  log "대용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
 
 else
-  # 96GB+: M1/M2/M3 Max 128GB/192GB
+   # 96GB+: M1/M2/M3 Max 128GB/192GB
   PROFILE="max_ultra"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  HERMES_CTX=131072
+  HERMES_CTX=262144
   BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
   MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.3-70b-versatile"
-  log "초최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
+  FALLBACK_MODEL="llama-3.1-70b-instruct"
+  log "초최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 최대 컨텍스트)"
 fi
 
 # ── 체크포인트 1: Python 체크 ─────────────────────────────────────────────

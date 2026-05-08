@@ -36,80 +36,47 @@ echo "  칩: $CPU_MODEL"
 echo "  메모리: ${TOTAL_RAM_GB}GB"
 
 # 메모리 기반 모델/컨텍스트tier 정의 (2026-05-07 최종)
-# 기준: 모델 가중치 + KV 캐시 + 시스템(~10GB) + 여유 확보
+# Mac 구성: Pro(32GB, 48GB), Max(64GB, 128GB)
 # qwen3.6:27b-coding-nvfp4 = 4-bit 양자화, 모델 크기 ~20GB
-# KV 캐시: 44KB/token (88 layers × 2 heads × 128 dim × 2 bytes)
-# 사용자 테스트: 64GB → 131K ctx → 83% 사용 중 (최적)
+# KV 캐시: ~44KB/token
 # 최소 요구: 32GB 미만은 실행 불가
 if [[ $TOTAL_RAM_GB -lt 32 ]]; then
-    # 32GB 미만: M2/M3/M4 Pro (16~24GB) — 모델 실행 불가
+      # 16~24GB: M2/M3/M4 Pro — 모델 실행 불가
   err "이 Mac은 ${TOTAL_RAM_GB}GB로 최소 요구사항(32GB)을 만족하지 않습니다."
   err "qwen3.6:27b-coding-nvfp4 모델은 20GB가 필요하므로 최소 32GB RAM이 필수입니다."
   err "설치를 중단합니다."
   exit 1
 fi
 
-if [[ $TOTAL_RAM_GB -lt 44 ]]; then
-    # 32~40GB: M3/M4 Pro
-  # KV: 16384 * 44KB = 0.72GB → 총 30.72GB → 여유 1.3GB (안전)
+if [[ $TOTAL_RAM_GB -le 48 ]]; then
+      # Pro 32~48GB
   PROFILE="pro"
   HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
   HERMES_CTX=16384
   BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
   MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.3-8b-instruct"
-  warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32GB 기준 안전선)"
+  warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32~48GB 기준)"
 
-elif [[ $TOTAL_RAM_GB -lt 60 ]]; then
-    # 48GB: M4 Max / M3 Max
-  # KV: 65536 * 44KB = 2.88GB → 총 32.88GB → 여유 15GB (충분)
-  PROFILE="max_small"
+elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
+      # 64GB: M2/M3/M4 Max
+  PROFILE="max"
   HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
-  HERMES_CTX=65536
-  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
+  HERMES_CTX=131072
+  BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
   MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.1-70b-instruct"
-  warn "대용량-small 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 48GB 기준)"
-
-elif [[ $TOTAL_RAM_GB -lt 60 ]]; then
-   # 48GB: M4 Max
-  PROFILE="max_small"
-  HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  HERMES_CTX=65536
-  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
-  MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.1-70b-instruct"
-  warn "대용량-small 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
-
-elif [[ $TOTAL_RAM_GB -lt 80 ]]; then
-   # 64GB: M2/M3/M4 Max
-  PROFILE="max"
-  HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  HERMES_CTX=131072
-  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
-  MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.1-70b-instruct"
-  log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX}) — 약 83% 메모리 사용"
-
-elif [[ $TOTAL_RAM_GB -lt 96 ]]; then
-   # 72~95GB: M2/M3/M4 Max 96GB
-  PROFILE="max_large"
-  HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  HERMES_CTX=131072
-  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
-  MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
-  FALLBACK_MODEL="llama-3.1-70b-instruct"
-  log "대용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX})"
+  log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 64GB 기준, 약 83% 사용)"
 
 else
-   # 96GB+: M1/M2/M3 Max 128GB/192GB
+      # 128GB: M3/M4 Max
   PROFILE="max_ultra"
-  HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
+  HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
   HERMES_CTX=262144
-  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
-  MCP_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
+  BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
+  MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.1-70b-instruct"
-  log "초최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 최대 컨텍스트)"
+  log "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 128GB, 컨텍스트 최대)"
 fi
 
 # ── 체크포인트 1: Python 체크 ─────────────────────────────────────────────
@@ -138,17 +105,6 @@ brew list jq >/dev/null 2>&1 || brew install jq
 brew list yq >/dev/null 2>&1 || brew install yq
 log "필수 도구: jq, yq"
 
-# ── 체크포인트 3: Docker Desktop ──────────────────────────────────────────────
-section("3. Docker Desktop")
-
-if ! command -v docker &>/dev/null || ! docker info &>/dev/null 2>&1; then
-  warn "Docker Desktop이 설치되지 않았습니다."
-  warn "https://www.docker.com/products/docker-desktop/ 에서 설치 후 'Docker Desktop.app'을 실행하세요."
-  warn "Docker Desktop이 시작되면 스크립트를 다시 실행하세요."
-  exit 1
-fi
-
-log "Docker Desktop 실행 중"
 
 # ── 체크포인트 4: Ollama (Homebrew 전용) ──────────────────────────────────────
 section("4. Ollama 설치 및 컨텍스트 고정")
@@ -267,7 +223,7 @@ else
   log "Hermes Agent 설치 완료"
 fi
 
-# ── 체크포인트 6: config.yaml ────────────────────────────────────────────
+# ── 체크포인트 7: config.yaml ────────────────────────────────────────────
 section("6. config.yaml 자동 생성")
 
 CONFIG_FILE="$HERMES_HOME/config.yaml"
@@ -401,50 +357,7 @@ else
   fi
 fi
 
-# ── 체크포인트 8: Open WebUI (Docker) ─────────────────────────────────────
-section("8. Open WebUI 설치 (Docker)")
-
-EXISTING_WEBUI=$(docker ps -a --filter "name=open-webui" --format "{{.Names}}" 2>/dev/null || echo "")
-
-if [[ -n "$EXISTING_WEBUI" ]]; then
-  WEBUI_STATUS=$(docker inspect --format '{{.State.Status}}' "$EXISTING_WEBUI" 2>/dev/null || echo "unknown")
-  if [[ "$WEBUI_STATUS" == "running" ]]; then
-    log "Open WebUI 컨테이너가 이미 실행 중입니다"
-  elif [[ "$WEBUI_STATUS" == "exited" || "$WEBUI_STATUS" == "dead" ]]; then
-    warn "기존 Open WebUI 컨테이너가 중지되었습니다. 재시작합니다..."
-    docker start "$EXISTING_WEBUI"
-    log "재시작 완료"
-  fi
-else
-  warn "Open WebUI가 설치되지 않았습니다. Docker로 시작합니다..."
-  docker pull ghcr.io/open-webui/open-webui:main 2>&1 | tail -1
-  docker run -d \
-    --name open-webui \
-    -p 3000:8080 \
-    --add-host=host.docker.internal:host-gateway \
-    -e WEBUI_AUTH=False \
-    -e ENABLE_SEARCH=true \
-    ghcr.io/open-webui/open-webui:main
-  log "Open WebUI 컨테이너 시작됨"
-  sleep 3
-fi
-
-# 헬스체크
-MAX_RETRIES=10
-WEBSITE_URL="http://localhost:3000"
-for i in $(seq 1 $MAX_RETRIES); do
-  if curl -sf "$WEBSITE_URL" &>/dev/null; then break; fi
-  sleep 2
-done
-
-if curl -sf "$WEBSITE_URL" &>/dev/null; then
-  log "Open WebUI 접근 가능: $WEBSITE_URL"
-  warn "설정 → Connections → Base URL: http://host.docker.internal:11434/v1"
-else
-  warn "Open WebUI 시작 중... 잠시 후 접속하세요"
-fi
-
-# ── 체크포인트 9: MLX 가상환경 ────────────────────────────────────────────
+# ── 체크포인트 7: MLX 가상환경 ────────────────────────────────────────────
 section("9. MLX 가상환경")
 
 MLX_VENV="$HOME/mlx-env"
@@ -472,25 +385,22 @@ else
   log "MLX venv activate를 .zshrc에 추가"
 fi
 
-# ── 체크포인트 10: 최종 정리 ────────────────────────────────────────────
-section("10. 설치 완료! — 다음 단계")
+# ── 체크포인트 8: 최종 정리 ────────────────────────────────────────────
+section("8. 설치 완료! — 다음 단계")
 
 echo ""
 echo -e "${BOLD}═══ 설치가 완료되었습니다! ═══${NC}"
 echo ""
-echo "  프로필        : $PROFILE"
-echo "  주요 모델     : $HERMES_LABEL ($HERMES_MODEL, ${HERMES_CTX} ctx)"
-echo "  백업 모델     : $BACKUP_MODEL"
-echo "  Ollama URL    : http://localhost:11434/v1"
-echo "  Hermes        : hermes"
-echo "  Open WebUI    : http://localhost:3000"
+echo "  프로필         : $PROFILE"
+echo "  주요 모델      : $HERMES_LABEL ($HERMES_MODEL, ${HERMES_CTX} ctx)"
+echo "  백업 모델      : $BACKUP_MODEL"
+echo "  Ollama URL     : http://localhost:11434/v1"
+echo "  Hermes         : hermes"
 echo ""
 echo -e "${BOLD}수동 작업:${NC}"
-echo "  1. 새 터미널: source ~/.zshrc"
-echo "  2. Ollama 상태: ollama ps"
-echo "  3. Hermes 시작: hermes"
-echo "  4. WebUI 설정: Connections → Ollama URL = http://host.docker.internal:11434/v1"
-echo "  5. WebUI 설정: Web Search → SearXNG 또는 DuckDuckGo"
+echo "   1. 새 터미널: source ~/.zshrc"
+echo "   2. Ollama 상태: ollama ps"
+echo "   3. Hermes 시작: hermes"
 echo ""
 echo -e "${BOLD}🔑 API 키 확인:${NC} nano ~/.hermes/config.yaml"
 echo ""
@@ -575,29 +485,14 @@ else
   fail "config.yaml 없음"
 fi
 
-# 7. Docker
-check "docker info"
-
-# 8. Open WebUI
-if docker ps --filter "name=open-webui" --format "{{.Names}}" | grep -q "open-webui"; then
-  OW_STATUS=$(docker inspect --format '{{.State.Status}}' open-webui 2>/dev/null)
-  if [[ "$OW_STATUS" == "running" ]]; then
-    ok "Open WebUI: 실행 중"
-  else
-    warn "Open WebUI: 중지됨 ($OW_STATUS)"
-  fi
-else
-  warn "Open WebUI: 설치 안됨"
-fi
-
-# 9. MLX venv
+# 7. MLX venv
 if [[ -d "$HOME/mlx-env" ]]; then
   ok "MLX venv 존재"
 else
   warn "MLX venv 없음"
 fi
 
-# 10. Modelfile num_ctx
+# 8. Modelfile num_ctx
 MODELF_CTX=$(cat "$HOME/Modelfile" 2>/dev/null | grep -oP 'num_ctx\s+\K\d+' || echo "0")
 if [[ "$MODELF_CTX" -gt 0 ]]; then
   ok "Modelfile num_ctx: $MODELF_CTX"

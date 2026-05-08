@@ -35,34 +35,41 @@ CPU_MODEL=$(system_profiler SPHardwareDataType 2>/dev/null | grep "Chip" | sed '
 echo "  칩: $CPU_MODEL"
 echo "  메모리: ${TOTAL_RAM_GB}GB"
 
-# 메모리 기반 모델/컨텍스트tier 정의 (2026-05-07 업데이트)
-# 기준: 모델 가중치 + KV 캐시 + 시스템(~10GB) + 여유 8~10GB
-# 사용자 테스트 결과 반영:
-#   16~24GB : 컨텍스트 65K, 가벼운 모델 (27b는 MLX 아님)
-#   32~40GB : 27b 4-bit (nvfp4), 컨텍스트 65K
-#   48GB    : 35b-a3b mxfp8, 컨텍스트 65K
-#   64GB    : 35b-a3b mxfp8, 컨텍스트 131K (약 83% 사용 — 충분)
-#   72~95GB : 35b-a3b mxfp8, 컨텍스트 131K
-#   96GB+   : 35b-a3b mxfp8, 컨텍스트 262K (최대)
-if [[ $TOTAL_RAM_GB -lt 28 ]]; then
-   # 16~24GB: M2/M3/M4 Pro
-  PROFILE="pro_small"
-  HERMES_MODEL="qwen3:4b"
-  HERMES_CTX=32768
-  BACKUP_MODEL="gemma3:4b"
-  MCP_MODEL="qwen3:4b"
-  FALLBACK_MODEL="llama-3.3-8b-instruct"
-  warn "소용량 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX}) — 27b는 MLX 양자화 없음"
+# 메모리 기반 모델/컨텍스트tier 정의 (2026-05-07 최종)
+# 기준: 모델 가중치 + KV 캐시 + 시스템(~10GB) + 여유 확보
+# qwen3.6:27b-coding-nvfp4 = 4-bit 양자화, 모델 크기 ~20GB
+# KV 캐시: 44KB/token (88 layers × 2 heads × 128 dim × 2 bytes)
+# 사용자 테스트: 64GB → 131K ctx → 83% 사용 중 (최적)
+# 최소 요구: 32GB 미만은 실행 불가
+if [[ $TOTAL_RAM_GB -lt 32 ]]; then
+    # 32GB 미만: M2/M3/M4 Pro (16~24GB) — 모델 실행 불가
+  err "이 Mac은 ${TOTAL_RAM_GB}GB로 최소 요구사항(32GB)을 만족하지 않습니다."
+  err "qwen3.6:27b-coding-nvfp4 모델은 20GB가 필요하므로 최소 32GB RAM이 필수입니다."
+  err "설치를 중단합니다."
+  exit 1
+fi
 
-elif [[ $TOTAL_RAM_GB -lt 44 ]]; then
-   # 32~40GB: M3/M4 Pro
+if [[ $TOTAL_RAM_GB -lt 44 ]]; then
+    # 32~40GB: M3/M4 Pro
+  # KV: 16384 * 44KB = 0.72GB → 총 30.72GB → 여유 1.3GB (안전)
   PROFILE="pro"
-  HERMES_MODEL="qwen3:27b"
+  HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
+  HERMES_CTX=16384
+  BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
+  MCP_MODEL="qwen3.6:27b-coding-nvfp4"
+  FALLBACK_MODEL="llama-3.3-8b-instruct"
+  warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32GB 기준 안전선)"
+
+elif [[ $TOTAL_RAM_GB -lt 60 ]]; then
+    # 48GB: M4 Max / M3 Max
+  # KV: 65536 * 44KB = 2.88GB → 총 32.88GB → 여유 15GB (충분)
+  PROFILE="max_small"
+  HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
   HERMES_CTX=65536
-  BACKUP_MODEL="gemma3:12b"
-  MCP_MODEL="qwen3:27b"
+  BACKUP_MODEL="qwen3.6:35b-a3b-coding-nvfp4"
+  MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.1-70b-instruct"
-  warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX})"
+  warn "대용량-small 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 48GB 기준)"
 
 elif [[ $TOTAL_RAM_GB -lt 60 ]]; then
    # 48GB: M4 Max

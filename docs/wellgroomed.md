@@ -179,16 +179,16 @@ model:
 3. **Wired 메모리 누수** (재부팅 필요)
 4. **실질적으로 더 짧은 대화** (중간에 모델 내려가므로)
 
-### 압축 설정 최적화 (최신)
+### 압축 설정 최적화 (최신 — 60% 권장)
 ```yaml
 compression:
   enabled: true
-  threshold: 0.5         # 50%에서 자동 압축
-  target_ratio: 0.2      # 20%까지 압축
-  protect_last_n: 20     # 최근 20개 보호
+  threshold: 0.6           # 60%에서 자동 압축 (원문 78K 토큰 유지)
+  target_ratio: 0.15       # 15%까지 압축
+  protect_last_n: 10       # 최근 10개 보호
 ```
 
-> 💡 `threshold`를 낮추면 더 일찍 압축이 시작되고, `target_ratio`를 낮추면 더 강하게 압축됩니다.
+> 💡 threshold를 높이면 더 늦게 압축 시작 → 원문이 더 오래 보존됨. 60%가 64GB의 여유를 고려한 적정선.
 
 ### 개인 정보 보호 (PII Redaction)
 ```yaml

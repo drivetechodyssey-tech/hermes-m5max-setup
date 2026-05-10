@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hermes Agent — Config Reference</title>
+<style>
+:root{
+  --bg:#0b0f14;--bg2:#111820;--bg3:#182029;--border:#1e2a38;
+  --ink:#cdd9e4;--ink2:#7a8a9a;--ink3:#506070;
+  --accent:#4a9eff;--accent2:#367bf5;--accent-dim:rgba(74,158,255,.1);
+  --green:#34d399;--yellow:#fbbf24;--red:#f87171;--purple:#a78bfa;--cyan:#22d3ee;--orange:#fb923c;
+  --radius:8px;--mono:'SF Mono','Cascadia Code','Fira Code',monospace;
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:80px}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);line-height:1.7;font-size:15px}
+/* NAV */
+#nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(11,15,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+#nav .brand{font-weight:700;font-size:16px;color:var(--accent);letter-spacing:-.3px}
+#nav .brand span{color:var(--ink2);font-weight:400;margin-left:6px;font-size:13px}
+.nav-links{display:flex;gap:18px;list-style:none;flex-wrap:wrap;justify-content:flex-end}
+.nav-links a{color:var(--ink2);text-decoration:none;font-size:13px;transition:color .15s}
+.nav-links a:hover{color:var(--accent)}
+/* LAYOUT */
+.wrap{max-width:1200px;margin:0 auto;padding:80px 24px 100px}
+/* HERO */
+.hero{text-align:center;padding:60px 0 50px;border-bottom:1px solid var(--border);margin-bottom:50px}
+.hero h1{font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:12px;background:linear-gradient(135deg,var(--accent),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero p{color:var(--ink2);font-size:17px;max-width:600px;margin:0 auto}
+.hero .badge{display:inline-block;margin-top:18px;background:var(--accent-dim);color:var(--accent);padding:4px 14px;border-radius:20px;font-size:12px;font-weight:600;letter-spacing:.5px}
+/* SECTION */
+.sec{margin-bottom:50px}
+.sec h2{font-size:26px;font-weight:700;margin-bottom:20px;color:var(--ink);letter-spacing:-.5px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.sec h2 .icon{font-size:22px}
+.sec h3{font-size:17px;font-weight:600;margin:20px 0 10px;color:var(--accent)}
+.sec h4{font-size:14px;font-weight:600;margin:14px 0 8px;color:var(--ink);text-transform:uppercase;letter-spacing:.5px}
+/* GRID CARDS */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin:16px 0}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:18px;transition:border-color .2s}
+.card:hover{border-color:var(--accent)}
+.card h4{font-size:14px;font-weight:600;margin-bottom:6px;color:var(--accent)}
+.card p{font-size:13px;color:var(--ink2);line-height:1.6}
+.card .val{font-family:var(--mono);font-size:13px;color:var(--green);margin-top:6px;display:block}
+/* TABLE */
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+th{text-align:left;padding:10px 14px;background:var(--bg3);color:var(--ink);font-weight:600;border:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:10px 14px;border:1px solid var(--border);color:var(--ink2)}
+tr td:first-child{font-family:var(--mono);font-size:13px;color:var(--ink);white-space:nowrap}
+/* CODE BLOCKS */
+pre{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;overflow-x:auto;font-size:13px;line-height:1.7;margin:12px 0;position:relative}
+pre code{font-family:var(--mono);color:var(--ink);font-size:13px}
+pre .kw{color:var(--accent)}
+pre .str{color:var(--green)}
+pre .cm{color:var(--ink3);font-style:italic}
+pre .num{color:var(--orange)}
+pre .flag{color:var(--purple)}
+/* YAML HIGHLIGHT JS (lightweight) */
+pre .yn{color:var(--cyan)}
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;margin-left:8px;vertical-align:middle}
+.badge-green{background:rgba(52,211,153,.12);color:var(--green)}
+.badge-yellow{background:rgba(251,191,36,.12);color:var(--yellow)}
+.badge-red{background:rgba(248,113,113,.12);color:var(--red)}
+.badge-purple{background:rgba(167,139,250,.12);color:var(--purple)}
+.badge-cyan{background:rgba(34,211,238,.12);color:var(--cyan)}
+/* PROGRESS BAR */
+.gauge{flex:1;background:var(--bg3);border-radius:4px;height:10px;overflow:hidden;min-width:120px}
+.gauge-fill{height:100%;border-radius:4px;transition:width .3s}
+.row-compact{display:flex;align-items:center;gap:12px;margin:6px 0}
+/* TOC */
+.toc{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin:0 0 50px}
+.toc a{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);text-decoration:none;color:var(--ink2);font-size:13px;transition:all .2s}
+.toc a:hover{border-color:var(--accent);color:var(--accent);transform:translateX(4px)}
+.toc a .num{color:var(--accent);font-weight:700;font-size:11px;min-width:24px}
+/* ARCHITECTURE DIAGRAM */
+.arch-flow{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:center;margin:20px 0}
+.arch-node{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 20px;text-align:center;min-width:140px;position:relative}
+.arch-node.primary{border-color:var(--accent);box-shadow:0 0 20px var(--accent-dim)}
+.arch-node .name{font-weight:700;font-size:14px;color:var(--ink)}
+.arch-node .desc{font-size:11px;color:var(--ink3);margin-top:4px}
+.arch-arrow{color:var(--ink3);font-size:20px}
+.arch-group{border:1px dashed var(--border);border-radius:var(--radius);padding:16px 20px;background:rgba(74,158,255,.03)}
+.arch-group-label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--ink3);margin-bottom:10px;text-align:center}
+/* MEM BAR */
+.mem-bar{margin:16px 0}
+.mem-row{display:grid;grid-template-columns:100px 120px 1fr 80px;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px}
+.mem-row:last-child{border-bottom:none}
+.mem-row .ctx{font-family:var(--mono);color:var(--ink)}
+.mem-row .pct{font-family:var(--mono);font-weight:600;text-align:right}
+.mem-row .bar-wrap{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.mem-row .bar{height:100%;border-radius:4px}
+/* TWEAKS PANEL */
+#tweaks{position:fixed;bottom:20px;right:20px;z-index:200}
+#tweaks-btn{width:40px;height:40px;border-radius:50%;background:var(--accent);border:none;color:#fff;font-size:18px;cursor:pointer;box-shadow:0 4px 20px rgba(74,158,255,.3);transition:all .2s}
+#tweaks-btn:hover{transform:scale(1.1)}
+#tweaks-panel{display:none;position:absolute;bottom:50px;right:0;background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px;width:260px}
+#tweaks-panel.open{display:block}
+#tweaks-panel label{font-size:12px;color:var(--ink2);display:flex;align-items:center;gap:8px;margin:6px 0;cursor:pointer}
+#tweaks-panel input[type=checkbox]{accent-color:var(--accent)}
+/* RESPONSIVE */
+@media(max-width:700px){
+  .cards{grid-template-columns:1fr}
+  .toc{grid-template-columns:1fr}
+  .hero h1{font-size:28px}
+  .nav-links{display:none}
+  .mem-row{grid-template-columns:80px 1fr;}.mem-row .pct{display:none}
+}
+/* SCROLLBAR */
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+/* DARK MODE TOGGLE - default dark */
+body.light{--bg:#f5f6f8;--bg2:#fff;--bg3:#e9ecf0;--border:#d1d5dc;--ink:#1a2028;--ink2:#4a5568;--ink3:#8892a0;--accent:#2563eb;--accent2:#1d4ed8;--accent-dim:rgba(37,99,235,.08)}
+/* HIGHLIGHT */
+.highlight{background:rgba(74,158,255,.15);padding:1px 6px;border-radius:3px}
+/* PRINT */
+@media print{
+  #nav,#tweaks{display:none}
+  body{background:#fff;color:#111}
+  pre{border:1px solid #ccc;white-space:pre-wrap;word-break:break-all}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav id="nav">
+  <div class="brand">HERMES<span>Agent Config Reference</span></div>
+  <ul class="nav-links">
+    <li><a href="#overview">개요</a></li>
+    <li><a href="#model">모델</a></li>
+    <li><a href="#auxiliary">보조 API</a></li>
+    <li><a href="#compression">압축</a></li>
+    <li><a href="#toolsets">툴셋</a></li>
+    <li><a href="#platforms">플랫폼</a></li>
+    <li><a href="#memory">메모리</a></li>
+    <li><a href="#cron">크론</a></li>
+  </ul>
+</nav>
+
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <h1>Hermes Agent</h1>
+    <p>Apple Silicon M5 Max 64GB 환경의 Hermes 에이전트 설정을 전체 문서화한 참조 페이지입니다.</p>
+    <span class="badge">CONFIG VERSION 23 — 2026-05-09 기준</span>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <a href="#overview"><span class="num">01</span> 아키텍처 개요</a>
+    <a href="#model"><span class="num">02</span> 메인 모델 &amp; 제공자</a>
+    <a href="#auxiliary"><span class="num">03</span> 보조 API (Gemini / MCP)</a>
+    <a href="#fallback"><span class="num">04</span> 폴백 제공자 (Groq)</a>
+    <a href="#compression"><span class="num">05</span> 컨텍스트 압축</a>
+    <a href="#prompt-caching"><span class="num">06</span> 프롬프트 캐싱</a>
+    <a href="#agent"><span class="num">07</span> 에이전트 설정</a>
+    <a href="#persona"><span class="num">08</span> 페르소나 / 성격</a>
+    <a href="#display"><span class="num">09</span> 디스플레이 / TUI</a>
+    <a href="#browser"><span class="num">10</span> 브라우저 자동화</a>
+    <a href="#terminal"><span class="num">11</span> 터미널 / 컨테이너</a>
+    <a href="#toolsets"><span class="num">12</span> 툴셋 / 커드</a>
+    <a href="#privacy"><span class="num">13</span> 프라이버시</a>
+    <a href="#voice"><span class="num">14</span> 음성 (TTS / STT)</a>
+    <a href="#delegation"><span class="num">15</span>위임 (Delegation)</a>
+    <a href="#skills"><span class="num">16</span> 스킬</a>
+    <a href="#cron"><span class="num">17</span> 크론</a>
+    <a href="#kanban"><span class="num">18</span> 칸반</a>
+    <a href="#platforms"><span class="num">19</span> 플랫폼 연동</a>
+    <a href="#approvals"><span class="num">20</span> 승인 / hooks</a>
+    <a href="#security"><span class="num">21</span> 보안</a>
+    <a href="#logging"><span class="num">22</span> 로깅</a>
+    <a href="#memory"><span class="num">23</span> 메모리 시스템</a>
+    <a href="#sessions"><span class="num">24</span> 세션</a>
+    <a href="#updates"><span class="num">25</span> 업데이트</a>
+    <a href="#config"><span class="num">26</span> 전체 YAML 전체보기</a>
+  </div>
+
+  <!-- ===================== 01 ARCHITECTURE ===================== -->
+  <div class="sec" id="overview">
+    <h2><span class="icon">🏗</span> 아키텍처 개요</h2>
+    <div class="arch-flow">
+      <div class="arch-node primary">
+        <div class="name">🤖 Hermes Agent</div>
+        <div class="desc">메인 에이전트<br>Qwen 3.6 35B</div>
+      </div>
+      <span class="arch-arrow">⟵→</span>
+      <div class="arch-group">
+        <div class="arch-group-label">보조 API (Gemini 2.5 Flash)</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <div class="arch-node"><div class="name">👁 비전</div><div class="desc">이미지 분석</div></div>
+          <div class="arch-node"><div class="name">🌐 웹추출</div><div class="desc">웹페이지 정보 추출</div></div>
+          <div class="arch-node"><div class="name">📦 압축</div><div class="desc">컨텍스트 요약</div></div>
+          <div class="arch-node"><div class="name">🔍 세션검색</div><div class="desc">과거 대화 검색</div></div>
+        </div>
+      </div>
+      <span class="arch-arrow">⟵→</span>
+      <div class="arch-group">
+        <div class="arch-group-label">폴백 (Groq)</div>
+        <div class="arch-node"><div class="name">⚡ Groq</div><div class="desc">Llama 3.3 70B<br>빠른 응답</div></div>
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card"><h4>환경</h4><p>MacBook Pro M5 Max / 64GB 통합 메모리 / macOS</p></div>
+      <div class="card"><h4>Ollama</h4><p>로컬 LLM 서버 — 모델 호스팅 & 추론 백엔드</p></div>
+      <div class="card"><h4>Gemini 2.5 Flash</h4><p>Google 무료 토큰 제공 — 웹추출/압축/비전 전담</p></div>
+      <div class="card"><h4>Groq</h4><p>로컬 모델 사용 불가 시 폴백 — 매우 빠른 추론</p></div>
+    </div>
+  </div>
+
+  <!-- ===================== 02 MODEL ===================== -->
+  <div class="sec" id="model">
+    <h2><span class="icon">🧠</span> 메인 모델</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>default</td><td>qwen3.6-hermes</td><td>Ollama에서 로드한 Qwen 3.6 35B (MLX mxfp8 양자화)</td></tr>
+      <tr><td>provider</td><td>custom</td><td>커스텀 OpenAI 호환 엔드포인트 사용</td></tr>
+      <tr><td>base_url</td><td>http://127.0.0.1:11434/v1</td><td>Ollama API 서버</td></tr>
+      <tr><td>context_length</td><td>131,072 <span class="badge badge-yellow">64GB 기준</span></td><td>약 83% 메모리 사용 (peak)</td></tr>
+      <tr><td>api_key</td><td>ollama</td><td>Ollama 기본 키</td></tr>
+    </table>
+    <h3>컨텍스트 크기별 메모리</h3>
+    <div class="mem-bar">
+      <div class="mem-row"><span class="ctx">262K</span><span class="pct" style="color:var(--red)">86GB</span><div class="bar-wrap"><div class="bar" style="width:100%;background:var(--red)"></div></div><span class="badge badge-red">초과</span></div>
+      <div class="mem-row"><span class="ctx">131K</span><span class="pct" style="color:var(--yellow)">63GB</span><div class="bar-wrap"><div class="bar" style="width:50%;background:var(--yellow)"></div></div><span class="badge badge-yellow">사용 중</span></div>
+      <div class="mem-row"><span class="ctx">65K</span><span class="pct" style="color:var(--green)">55GB</span><div class="bar-wrap"><div class="bar" style="width:33%;background:var(--green)"></div></div><span class="badge badge-green">안전</span></div>
+      <div class="mem-row"><span class="ctx">32K</span><span class="pct" style="color:var(--green)">52GB</span><div class="bar-wrap"><div class="bar" style="width:25%;background:var(--green)"></div></div><span class="badge badge-green">여유</span></div>
+    </div>
+    <div class="row-compact"><strong style="font-size:13px;color:var(--ink3)">KV 캐시 공식: </strong><code style="font-size:12px;color:var(--ink2)">2 × 컨텍스트 × 레이어 × KV헤드 × 헤드차원 × (비트수/8) ÷ 1GB — MLX는 fp16 저장 (4비트 모델도 KV는 16비트)</code></div>
+  </div>
+
+  <!-- ===================== 03 AUXILIARY ===================== -->
+  <div class="sec" id="auxiliary">
+    <h2><span class="icon">⚡</span> 보조 API (Gemini 2.5 Flash)</h2>
+    <p style="color:var(--ink2);font-size:14px;margin-bottom:14px">Gemini Flash를 보조로 사용해 로컬 모델의 부하를 줄이고 전문적인 성능을 얻습니다.</p>
+    <table>
+      <tr><th>역할</th><th>모델</th><th>타임아웃</th><th>설명</th></tr>
+      <tr><td>비전</td><td>gemini-2.5-flash</td><td>120s</td><td>이미지 분석</td></tr>
+      <tr><td>웹추출</td><td>gemini-2.5-flash</td><td>360s</td><td>웹페이지 정보 추출</td></tr>
+      <tr><td>압축</td><td>gemini-2.5-flash</td><td>120s</td><td>컨텍스트 자동 요약</td></tr>
+      <tr><td>세션검색</td><td>gemini-2.5-flash</td><td>30s</td><td>과거 세션 검색 (동시 3)</td></tr>
+      <tr><td>MCP</td><td>qwen3.6:35b-a3b-coding-nvfp4</td><td>30s</td><td>로컬 Ollama → MCP 서버</td></tr>
+    </table>
+    <div class="cards">
+      <div class="card"><h4>skills_hub</h4><span class="val provider: auto — 외부 모델 자동 선택</span></div>
+      <div class="card"><h4>approval</h4><span class="val provider: auto — 커스드 승인 리퀘스트</span></div>
+      <div class="card"><h4>title_generation</h4><span class="val provider: auto — 세션 제목 자동 생성</span></div>
+      <div class="card"><h4>triage_specifier</h4><span class="val provider: auto — 작업 분류 지정</span></div>
+      <div class="card"><h4>curator</h4><span class="val provider: auto — 스킬 커레이터</span></div>
+    </div>
+  </div>
+
+  <!-- ===================== 04 FALLBACK ===================== -->
+  <div class="sec" id="fallback">
+    <h2><span class="icon">🔄</span> 폴백 제공자</h2>
+    <div class="cards">
+      <div class="card"><h4>Groq</h4><p>Llama 3.3 70b Versatile<br>1,000 req/일 무료 TPM — 매우 빠름</p></div>
+    </div>
+  </div>
+
+  <!-- ===================== 05 COMPRESSION ===================== -->
+  <div class="sec" id="compression">
+    <h2><span class="icon">📦</span> 컨텍스트 압축</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>enabled</td><td>true</td><td>자동 압축 활성화</td></tr>
+      <tr><td>threshold</td><td>0.6 <span class="badge badge-green">60% 권장</span></td><td>컨텍스트의 60% 차지시 압축 시작 (약 78K 토큰)</td></tr>
+      <tr><td>target_ratio</td><td>0.15 <span class="badge badge-green">15%</span></td><td>압축 후 15% 수준까지 토큰 줄임 (~19K)</td></tr>
+      <tr><td>protect_last_n</td><td>10</td><td>최근 10개 메시지는 절대 요약 안 함</td></tr>
+      <tr><td>hygiene_hard_message_limit</td><td>400</td><td>최대 메시지 수로 하드 리미트</td></tr>
+    </table>
+    <p style="color:var(--ink3);font-size:12px;margin-top:10px">💡 60%는 64GB의 여유를 고려한 적정선. threshold를 높일수록 원문이 더 오래 보존됨.</p>
+  </div>
+
+  <!-- ===================== 06 PROMPT CACHING ===================== -->
+  <div class="sec" id="prompt-caching">
+    <h2><span class="icon">💾</span> 프롬프트 캐싱</h2>
+    <table>
+      <tr><th>설정</th><th>값</th></tr>
+      <tr><td>cache_ttl</td><td>5m</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 07 AGENT ===================== -->
+  <div class="sec" id="agent">
+    <h2><span class="icon">⚙</span> 에이전트</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>max_turns</td><td>90</td><td>한 세션당 최대 턴 수</td></tr>
+      <tr><td>gateway_timeout</td><td>1800s (30min)</td><td>게이트웨이 타임아웃</td></tr>
+      <tr><td>restart_drain_timeout</td><td>180s (3min)</td><td>재시작 시 드레인 기다림</td></tr>
+      <tr><td>api_max_retries</td><td>3</td></tr>
+      <tr><td>tool_use_enforcement</td><td>auto</td></tr>
+      <tr><td>gateway_timeout_warning</td><td>900s</td></tr>
+      <tr><td>gateway_notify_interval</td><td>180s</td></tr>
+      <tr><td>gateway_auto_continue_freshness</td><td>3600s</td></tr>
+      <tr><td>image_input_mode</td><td>auto</td></tr>
+      <tr><td>reasoning_effort</td><td>medium</td></tr>
+      <tr><td>verbose</td><td>false</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 08 PERSONA ===================== -->
+  <div class="sec" id="persona">
+    <h2><span class="icon">🎭</span> 페르소나</h2>
+    <table>
+      <tr><th>이름</th><th>설명</th></tr>
+      <tr><td>helpful</td><td>도움이 많고 친근한 AI 어시스턴트</td></tr>
+      <tr><td>concise</td><td>간결하게 답변</td></tr>
+      <tr><td>technical</td><td>기술 전문가 — 상세하고 정확한 기술 정보</td></tr>
+      <tr><td>creative</td><td>창의적 발상, 혁신적인 해결책</td></tr>
+      <tr><td>teacher</td><td>차분한 선생님 — 예시와 함께 명확히 설명</td></tr>
+      <tr><td>kawaii</td><td>★캐와이! ✨Sparkle!— 현재 <span class="badge badge-green">현재 활성화</span></td></tr>
+      <tr><td>catgirl</td><td>냥이 캐릭터 — "nya~" 표현</td></tr>
+      <tr><td>pirate</td><td>바다의 선장 — "yo ho ho"</td></tr>
+      <tr><td>shakespeare</td><td>세익스피어풍의 시 — 우아한 고전 영어</td></tr>
+      <tr><td>surfer</td><td>서퍼 bro — "totally rad"</td></tr>
+      <tr><td>noir</td><td>네오누아 탐정 — "silicon and secrets"</td></tr>
+      <tr><td>uwu</td><td>uwu~ 하얼</td></tr>
+      <tr><td>philosopher</td><td>철학자 — 근본적인 "왜"를 물음</td></tr>
+      <tr><td>hype</td><td>🔥🔥🔥 hype man</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 09 DISPLAY ===================== -->
+  <div class="sec" id="display">
+    <h2><span class="icon">🖥</span> 디스플레이 / TUI</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>compact</td><td>false</td><td>와이드 뷰 (컴팩트 아님)</td></tr>
+      <tr><td>personality</td><td>kawaii</td><td><span class="badge badge-green">활성화 중</span></td></tr>
+      <tr><td>resume_display</td><td>full</td><td>세션.resume 시 전체 표시</td></tr>
+      <tr><td>busy_input_mode</td><td>interrupt</td><td>바쁠 때 입력 모션</td></tr>
+      <tr><td>tui_auto_resume_recent</td><td>false</td></tr>
+      <tr><td>bell_on_complete</td><td>false</td></tr>
+      <tr><td>show_reasoning</td><td>false</td></tr>
+      <tr><td>streaming</td><td>true</td><td><span class="badge badge-green">스트리밍 켬</span></td></tr>
+      <tr><td>final_response_markdown</td><td>strip</td></tr>
+      <tr><td>persistent_output</td><td>true</td><td>최종 응답 유지</td></tr>
+      <tr><td>persistent_output_max_lines</td><td>200</td></tr>
+      <tr><td>inline_diffs</td><td>true</td><td>인라인 diff 표시</td></tr>
+      <tr><td>show_cost</td><td>false</td></tr>
+      <tr><td>skin</td><td>default</td></tr>
+      <tr><td>language</td><td>en</td></tr>
+      <tr><td>tui_status_indicator</td><td>kaomoji</td></tr>
+      <tr><td>tool_progress</td><td>all</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 10 BROWSER ===================== -->
+  <div class="sec" id="browser">
+    <h2><span class="icon">🌐</span> 브라우저 자동화</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>inactivity_timeout</td><td>120s</td><td>비활성시간 초과시 자동 종료</td></tr>
+      <tr><td>command_timeout</td><td>30s</td></tr>
+      <tr><td>record_sessions</td><td>false</td></tr>
+      <tr><td>dialog_policy</td><td>must_respond</td><td>디얼로그는 반드시 응답</td></tr>
+      <tr><td>dialog_timeout_s</td><td>300s</td></tr>
+      <tr><td>auto_local_for_private_urls</td><td>true</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 11 TERMINAL ===================== -->
+  <div class="sec" id="terminal">
+    <h2><span class="icon">💻</span> 터미널 / 컨테이너</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>backend</td><td>local</td><td>로컬 터미널</td></tr>
+      <tr><td>modal_mode</td><td>auto</td></tr>
+      <tr><td>timeout</td><td>180s</td></tr>
+      <tr><td>auto_source_bashrc</td><td>true</td></tr>
+      <tr><td>persistent_shell</td><td>true</td><td>지속성 셸 (재사용)</td></tr>
+      <tr><td>lifetime_seconds</td><td>300s</td><td>셸 생명주기</td></tr>
+      <tr><td>docker_image</td><td>nikolaik/python-nodejs:python3.11-nodejs20</td></tr>
+      <tr><td>container_cpu</td><td>1</td></tr>
+      <tr><td>container_memory</td><td>5120 MB</td></tr>
+      <tr><td>container_disk</td><td>51200 MB</td></tr>
+      <tr><td>container_persistent</td><td>true</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 12 TOOLSETS ===================== -->
+  <div class="sec" id="toolsets">
+    <h2><span class="icon">🧰</span> 툴셋 / 플랫폼</h2>
+    <h3>사용 툴셋</h3>
+    <div class="row-compact"><span class="badge badge-green">hermes-cli</span></div>
+    <h3>플랫폼별 툴셋 매핑</h3>
+    <table>
+      <tr><th>플랫폼</th><th>툴셋</th></tr>
+      <tr><td>CLI</td><td>hermes-cli</td></tr>
+      <tr><td>Telegram</td><td>hermes-telegram</td></tr>
+      <tr><td>Discord</td><td>hermes-discord</td></tr>
+      <tr><td>WhatsApp</td><td>hermes-whatsapp</td></tr>
+      <tr><td>Slack</td><td>hermes-slack</td></tr>
+      <tr><td>Signal</td><td>hermes-signal</td></tr>
+      <tr><td>Home Assistant</td><td>hermes-homeassistant</td></tr>
+      <tr><td>QQ Bot</td><td>hermes-qqbot</td></tr>
+      <tr><td>원바오</td><td>hermes-yuanbao</td></tr>
+      <tr><td>Teams</td><td>hermes-teams</td></tr>
+      <tr><td>Google Chat</td><td>hermes-google_chat</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 13 PRIVACY ===================== -->
+  <div class="sec" id="privacy">
+    <h2><span class="icon">🔒</span> 프라이버시</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>redact_pii</td><td>true <span class="badge badge-green">활성</span></td><td>외부 AI 전송 시 개인 식별 정보 자동 감쇄</td></tr>
+      <tr><td>redact_secrets</td><td>true <span class="badge badge-green">활성</span></td><td>API 키, 비밀번호 자동 감쇄</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 14 VOICE ===================== -->
+  <div class="sec" id="voice">
+    <h2><span class="icon">🎤</span> 음성 (TTS / STT)</h2>
+    <h3>Text-to-Speech</h3>
+    <table>
+      <tr><th>프로바이더</th><th>음성</th></tr>
+      <tr><td>edge (default)</td><td>en-US-AriaNeural</td></tr>
+      <tr><td>elevenlabs</td><td>voice: pNInz6obpgDQGcFmaJgB</td></tr>
+      <tr><td>openai</td><td>gpt-4o-mini-tts / voice: alloy</td></tr>
+    </table>
+    <h3>Speech-to-Text</h3>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>enabled</td><td>true <span class="badge badge-green">활성</span></td></tr>
+      <tr><td>provider</td><td>local</td><td>로컬 STT</td></tr>
+      <tr><td>local.model</td><td>base</td></tr>
+      <tr><td>record_key</td><td>ctrl+b</td></tr>
+      <tr><td>max_recording_seconds</td><td>120</td></tr>
+      <tr><td>auto_tts</td><td>false</td></tr>
+      <tr><td>silence_duration</td><td>3.0s</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 15 DELEGATION ===================== -->
+  <div class="sec" id="delegation">
+    <h2><span class="icon">📋</span> 하위 위임 (Delegation)</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>max_iterations</td><td>50</td><td>하위 에이전트당 최대 반복</td></tr>
+      <tr><td>child_timeout_seconds</td><td>600s</td></tr>
+      <tr><td>max_concurrent_children</td><td>3</td></tr>
+      <tr><td>max_spawn_depth</td><td>1</td><td>최대 중첩 레벨</td></tr>
+      <tr><td>orchestrator_enabled</td><td>true <span class="badge badge-green">활성</span></td><td>오케스트레이트러 자 에이전트 허용</td></tr>
+      <tr><td>subagent_auto_approve</td><td>false</td><td><span class="badge badge-yellow">수동 승인</span> 하위 에이전트 자동 승인 안 함</td></tr>
+      <tr><td>inherit_mcp_toolsets</td><td>true</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 16 SKILLS ===================== -->
+  <div class="sec" id="skills">
+    <h2><span class="icon">📚</span> 스킬</h2>
+    <table>
+      <tr><th>설정</th><th>값</th></tr>
+      <tr><td>template_vars</td><td>true</td></tr>
+      <tr><td>inline_shell</td><td>false</td></tr>
+      <tr><td>inline_shell_timeout</td><td>10s</td></tr>
+      <tr><td>guard_agent_created</td><td>false</td></tr>
+      <tr><td>creation_nudge_interval</td><td>15</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 17 CRON ===================== -->
+  <div class="sec" id="cron">
+    <h2><span class="icon">⏰</span> 크론 (정기작업)</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>wrap_response</td><td>true <span class="badge badge-green">활성</span></td><td>응답으로 결과 랩핑</td></tr>
+      <tr><td>max_parallel_jobs</td><td>null</td><td>제한 없음</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 18 KANBAN ===================== -->
+  <div class="sec" id="kanban">
+    <h2><span class="icon">📌</span> 칸반 보드</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>dispatch_in_gateway</td><td>true <span class="badge badge-green">활성</span></td><td>게이트웨이에서 디스패치</td></tr>
+      <tr><td>dispatch_interval_seconds</td><td>60</td></tr>
+      <tr><td>failure_limit</td><td>2</td><td>2회 실패 시 폴백</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 19 PLATFORMS ===================== -->
+  <div class="sec" id="platforms">
+    <h2><span class="icon">📱</span> 플랫폼 연동</h2>
+    <table>
+      <tr><th>플랫폼</th><th>상태</th><th>설정</th></tr>
+      <tr><td>Telegram</td><td><span class="badge badge-green">연동됨</span></td><td>api_key 설정됨 / reactions: false</td></tr>
+      <tr><td>Discord</td><td>활성</td><td>require_mention: true / auto_thread: true / reactions: true</td></tr>
+      <tr><td>Slack</td><td>활성</td><td>require_mention: true</td></tr>
+      <tr><td>Mattermost</td><td>활성</td><td>require_mention: true</td></tr>
+      <tr><td>Matrix</td><td>활성</td><td>require_mention: true</td></tr>
+      <tr><td>WhatsApp</td><td>비활성</td><td>{} —미설정</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 20 APPROVALS ===================== -->
+  <div class="sec" id="approvals">
+    <h2><span class="icon">✅</span> 승인 &amp; Hooks</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>mode</td><td>manual <span class="badge badge-yellow">수동</span></td><td>모든 커드 수동 승인 필요</td></tr>
+      <tr><td>timeout</td><td>60s</td><td>승인 대기 시간</td></tr>
+      <tr><td>cron_mode</td><td>deny</td><td>크론 내 커드 거부</td></tr>
+      <tr><td>mcp_reload_confirm</td><td>true</td><td>MCP 재로딩 확인</td></tr>
+      <tr><td>hooks_auto_accept</td><td>false</td><td><span class="badge badge-yellow">수동 확인</span></td></tr>
+    </table>
+    <h4>허용된 커드</h4>
+    <div class="row-compact">
+      <span class="badge badge-green">script 실행 (-e/-c)</span>
+      <span class="badge badge-green">gateway stop/restart</span>
+      <span class="badge badge-green">재귀 삭제</span>
+      <span class="badge badge-green">shell 커드 (-c/-lc)</span>
+      <span class="badge badge-green">heredoc 실행</span>
+    </div>
+  </div>
+
+  <!-- ===================== 21 SECURITY ===================== -->
+  <div class="sec" id="security">
+    <h2><span class="icon">🛡</span> 보안</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>allow_private_urls</td><td>false</td><td>사설 URL 허용 안 함</td></tr>
+      <tr><td>redact_secrets</td><td>true</td><td>시크릿 자동 감쇄</td></tr>
+      <tr><td>tirith_enabled</td><td>true</td><td><span class="badge badge-green">활성</span> — tirith 보안 검사</td></tr>
+      <tr><td>tirith_timeout</td><td>5s</td><td>검사 시간제한</td></tr>
+      <tr><td>tirith_fail_open</td><td>true</td><td>검사 실패 시 열림 (방해되지 않게)</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 22 LOGGING ===================== -->
+  <div class="sec" id="logging">
+    <h2><span class="icon">📝</span> 로깅</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>level</td><td>INFO</td></tr>
+      <tr><td>max_size_mb</td><td>5MB</td></tr>
+      <tr><td>backup_count</td><td>3</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 23 MEMORY ===================== -->
+  <div class="sec" id="memory">
+    <h2><span class="icon">🧠</span> 메모리 시스템</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>memory_enabled</td><td>true <span class="badge badge-green">활성</span></td></tr>
+      <tr><td>user_profile_enabled</td><td>true <span class="badge badge-green">활성</span></td></tr>
+      <tr><td>memory_char_limit</td><td>2,200</td><td>메모리 최대 글자 수</td></tr>
+      <tr><td>user_char_limit</td><td>1,375</td><td>사용자 프로필 최대 글자 수</td></tr>
+      <tr><td>nudge_interval</td><td>10</td></tr>
+      <tr><td>flush_min_turns</td><td>6</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 24 SESSIONS ===================== -->
+  <div class="sec" id="sessions">
+    <h2><span class="icon">💬</span> 세션</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>auto_prune</td><td>false</td></tr>
+      <tr><td>retention_days</td><td>90일</td></tr>
+      <tr><td>vacuum_after_prune</td><td>true</td></tr>
+      <tr><td>min_interval_hours</td><td>24</td></tr>
+      <tr><td>session_reset.mode</td><td>both</td></tr>
+      <tr><td>idle_minutes</td><td>1,440 (24시간)</td></tr>
+      <tr><td>at_hour</td><td>4 (새벽 4시)</td></tr>
+      <tr><td>group_sessions_per_user</td><td>true</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 25 UPDATES ===================== -->
+  <div class="sec" id="updates">
+    <h2><span class="icon">🔄</span> 업데이트</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>pre_update_backup</td><td>false</td></tr>
+      <tr><td>backup_keep</td><td>5</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 26 CURATOR ===================== -->
+  <div class="sec" id="curator">
+    <h2><span class="icon">🗃</span> 커레이터 (스킬 정리)</h2>
+    <table>
+      <tr><th>설정</th><th>값</th><th>설명</th></tr>
+      <tr><td>enabled</td><td>true <span class="badge badge-green">활성</span></td></tr>
+      <tr><td>interval_hours</td><td>168 (매주)</td><td>정기 자동 스킬 정리</td></tr>
+      <tr><td>min_idle_hours</td><td>2</td></tr>
+      <tr><td>stale_after_days</td><td>30</td><td>30일 이상 미사용 → stale 플래그</td></tr>
+      <tr><td>archive_after_days</td><td>90</td><td>90일 → 아카이브</td></tr>
+      <tr><td>backup.enabled</td><td>true</td><td>백업 활성화</td></tr>
+      <tr><td>backup.keep</td><td>5</td><td>최대 5개 백업 유지</td></tr>
+    </table>
+  </div>
+
+  <!-- ===================== 27 FULL YAML ===================== -->
+  <div class="sec" id="config">
+    <h2><span class="icon">📄</span> config.yaml 전체</h2>
+    <p style="color:var(--ink2);font-size:14px;margin-bottom:12px">~/.hermes/config.yaml — 수정 전 반드시 백업하세요.</p>
+    <details>
+      <summary style="cursor:pointer;color:var(--accent);font-weight:600;margin-bottom:8px">▶ 전체 YAML 보기 (클릭)</summary>
+      <div style="margin-top:8px">
+<pre><code><span class="cm"># ── Main Model ─────────────────────────────────</span>
+model:
+  default: <span class="str">qwen3.6-hermes</span>
+  provider: <span class="str">custom</span>
+  base_url: <span class="str">http://127.0.0.1:11434/v1</span>
+  api_key: <span class="str">ollama</span>
+  context_length: <span class="num">131072</span>
+
+<span class="cm"># ── Fallback ───────────────────────────────────</span>
+fallback_providers:
+  - provider: <span class="str">custom</span>
+    base_url: <span class="str">https://api.groq.com/openai/v1</span>
+    api_key: <span class="str">gsk_l0...2oyt</span>
+    model: <span class="str">llama-3.3-70b-versatile</span>
+
+<span class="cm"># ── Agent ──────────────────────────────────────</span>
+agent:
+  max_turns: <span class="num">90</span>
+  gateway_timeout: <span class="num">1800</span>
+  restart_drain_timeout: <span class="num">180</span>
+  api_max_retries: <span class="num">3</span>
+  tool_use_enforcement: <span class="str">auto</span>
+  reasoning_effort: <span class="str">medium</span>
+  streaming: <span class="flag">true</span>
+  verbose: <span class="flag">false</span>
+
+<span class="cm"># ── Compression ────────────────────────────────</span>
+compression:
+  enabled: <span class="flag">true</span>
+  threshold: <span class="num">0.6</span>
+  target_ratio: <span class="num">0.15</span>
+  protect_last_n: <span class="num">10</span>
+  hygiene_hard_message_limit: <span class="num">400</span>
+
+<span class="cm"># ── Prompt Caching ────────────────────────────</span>
+prompt_caching:
+  cache_ttl: <span class="str">5m</span>
+
+<span class="cm"># ── Auxiliary APIs ────────────────────────────</span>
+auxiliary:
+  vision:
+    provider: <span class="str">custom</span>
+    model: <span class="str">gemini-2.5-flash</span>
+    base_url: <span class="str">https://generativelanguage.googleapis.com/v1beta/openai</span>
+    api_key: <span class="str">AIzaSy...oh3c</span>
+    timeout: <span class="num">120</span>
+  web_extract:
+    provider: <span class="str">custom</span>
+    model: <span class="str">gemini-2.5-flash</span>
+    api_key: <span class="str">AIzaSy...oh3c</span>
+    timeout: <span class="num">360</span>
+  compression:
+    provider: <span class="str">custom</span>
+    model: <span class="str">gemini-2.5-flash</span>
+    api_key: <span class="str">AIzaSy...oh3c</span>
+    timeout: <span class="num">120</span>
+  session_search:
+    provider: <span class="str">custom</span>
+    model: <span class="str">gemini-2.5-flash</span>
+    api_key: <span class="str">AIzaSy...oh3c</span>
+    timeout: <span class="num">30</span>
+    max_concurrency: <span class="num">3</span>
+  mcp:
+    provider: <span class="str">custom</span>
+    model: <span class="str">qwen3.6:35b-a3b-coding-nvfp4</span>
+    base_url: <span class="str">http://127.0.0.1:11434/v1</span>
+    api_key: <span class="str">ollama</span>
+    timeout: <span class="num">30</span>
+
+<span class="cm"># ── Display / TUI ─────────────────────────────</span>
+display:
+  compact: <span class="flag">false</span>
+  personality: <span class="str">kawaii</span>
+  resume_display: <span class="str">full</span>
+  streaming: <span class="flag">true</span>
+  final_response_markdown: <span class="str">strip</span>
+  persistent_output: <span class="flag">true</span>
+  persistent_output_max_lines: <span class="num">200</span>
+  inline_diffs: <span class="flag">true</span>
+  show_cost: <span class="flag">false</span>
+  skin: <span class="str">default</span>
+  language: <span class="str">en</span>
+  tui_status_indicator: <span class="str">kaomoji</span>
+  tool_progress: <span class="str">all</span>
+
+<span class="cm"># ── Terminal ──────────────────────────────────</span>
+terminal:
+  backend: <span class="str">local</span>
+  timeout: <span class="num">180</span>
+  auto_source_bashrc: <span class="flag">true</span>
+  persistent_shell: <span class="flag">true</span>
+  lifetime_seconds: <span class="num">300</span>
+  docker_image: <span class="str">nikolaik/python-nodejs:python3.11-nodejs20</span>
+  container_memory: <span class="num">5120</span>
+  container_disk: <span class="num">51200</span>
+  container_persistent: <span class="flag">true</span>
+
+<span class="cm"># ── Browser Automation ────────────────────────</span>
+browser:
+  inactivity_timeout: <span class="num">120</span>
+  command_timeout: <span class="num">30</span>
+  dialog_policy: <span class="str">must_respond</span>
+  auto_local_for_private_urls: <span class="flag">true</span>
+
+<span class="cm"># ── Privacy &amp; Security ────────────────────────</span>
+privacy:
+  redact_pii: <span class="flag">true</span>
+security:
+  redact_secrets: <span class="flag">true</span>
+  tirith_enabled: <span class="flag">true</span>
+  tirith_timeout: <span class="num">5</span>
+  tirith_fail_open: <span class="flag">true</span>
+
+<span class="cm"># ── Voice ─────────────────────────────────────</span>
+tts:
+  provider: <span class="str">edge</span>
+  edge: { voice: <span class="str">en-US-AriaNeural</span> }
+stt:
+  enabled: <span class="flag">true</span>
+  provider: <span class="str">local</span>
+  local: {model: <span class="str">base</span>}
+voice:
+  record_key: <span class="str">ctrl+b</span>
+  max_recording_seconds: <span class="num">120</span>
+  auto_tts: <span class="flag">false</span>
+
+<span class="cm"># ── Delegation ────────────────────────────────</span>
+delegation:
+  max_iterations: <span class="num">50</span>
+  child_timeout_seconds: <span class="num">600</span>
+  max_concurrent_children: <span class="num">3</span>
+  max_spawn_depth: <span class="num">1</span>
+  orchestrator_enabled: <span class="flag">true</span>
+  subagent_auto_approve: <span class="flag">false</span>
+
+<span class="cm"># ── Memory ────────────────────────────────────</span>
+memory:
+  memory_enabled: <span class="flag">true</span>
+  user_profile_enabled: <span class="flag">true</span>
+  memory_char_limit: <span class="num">2200</span>
+  user_char_limit: <span class="num">1375</span>
+  flush_min_turns: <span class="num">6</span>
+
+<span class="cm"># ── Skills ────────────────────────────────────</span>
+skills:
+  template_vars: <span class="flag">true</span>
+  inline_shell: <span class="flag">false</span>
+  inline_shell_timeout: <span class="num">10</span>
+
+<span class="cm"># ── Cron ──────────────────────────────────────</span>
+cron:
+  wrap_response: <span class="flag">true</span>
+
+<span class="cm"># ── Kanban ────────────────────────────────────</span>
+kanban:
+  dispatch_in_gateway: <span class="flag">true</span>
+  dispatch_interval_seconds: <span class="num">60</span>
+  failure_limit: <span class="num">2</span>
+
+<span class="cm"># ── Platform Toolsets ─────────────────────────</span>
+platform_toolsets:
+  cli: [<span class="str">hermes-cli</span>]
+  telegram: [<span class="str">hermes-telegram</span>]
+  discord: [<span class="str">hermes-discord</span>]
+  whatsapp: [<span class="str">hermes-whatsapp</span>]
+  slack: [<span class="str">hermes-slack</span>]
+  signal: [<span class="str">hermes-signal</span>]
+  homeassistant: [<span class="str">hermes-homeassistant</span>]
+  qqbot: [<span class="str">hermes-qqbot</span>]
+  yuanbao: [<span class="str">hermes-yuanbao</span>]
+  teams: [<span class="str">hermes-teams</span>]
+  google_chat: [<span class="str">hermes-google_chat</span>]
+
+<span class="cm"># ─--- Telegram ─────────────────────────────────</span>
+telegram:
+  reactions: <span class="flag">false</span>
+
+<span class="cm"># ─--- Discord ─────────────────────────────────</span>
+discord:
+  require_mention: <span class="flag">true</span>
+  auto_thread: <span class="flag">true</span>
+  reactions: <span class="flag">true</span>
+
+<span class="cm"># ─--- Approvals ───────────────────────────────</span>
+approvals:
+  mode: <span class="str">manual</span>
+  timeout: <span class="num">60</span>
+  cron_mode: <span class="str">deny</span>
+  mcp_reload_confirm: <span class="flag">true</span>
+hooks_auto_accept: <span class="flag">false</span>
+
+<span class="cm"># ─--- Logging ─────────────────────────────────</span>
+logging:
+  level: <span class="str">INFO</span>
+  max_size_mb: <span class="num">5</span>
+  backup_count: <span class="num">3</span>
+
+<span class="cm"># ─--- Memory/Curator ──────────────────────────</span>
+curator:
+  enabled: <span class="flag">true</span>
+  interval_hours: <span class="num">168</span>
+  stale_after_days: <span class="num">30</span>
+  archive_after_days: <span class="num">90</span>
+  backup: { enabled: <span class="flag">true</span>, keep: <span class="num">5</span> }
+
+<span class="cm"># ─--- Sessions ─────────────────────────────────</span>
+sessions:
+  auto_prune: <span class="flag">false</span>
+  retention_days: <span class="num">90</span>
+  vacuum_after_prune: <span class="flag">true</span>
+  min_interval_hours: <span class="num">24</span>
+session_reset:
+  mode: <span class="str">both</span>
+  idle_minutes: <span class="num">1440</span>
+  at_hour: <span class="num">4</span>
+group_sessions_per_user: <span class="flag">true</span>
+
+<span class="cm"># ─--- Custom Providers ────────────────────────</span>
+custom_providers:
+  - name: <span class="str">gemini-free</span>
+    base_url: <span class="str">https://generativelanguage.googleapis.com/v1beta/openai</span>
+    api_mode: <span class="str">chat_completions</span>
+  - name: <span class="str">groq-free</span>
+    base_url: <span class="str">https://api.groq.com/openai/v1</span>
+    api_mode: <span class="str">chat_completions</span>
+
+_config_version: <span class="num">23</span></code></pre>
+      </div>
+    </details>
+  </div>
+
+  <!-- FOOTER -->
+  <div style="text-align:center;padding:40px 0 20px;border-top:1px solid var(--border);color:var(--ink3);font-size:12px;margin-top:40px">
+    <p>Hermes Agent Config Reference — 2026-05-09</p>
+    <p style="margin-top:4px">~/.hermes/config.yaml · config version 23</p>
+  </div>
+
+</div><!-- .wrap -->
+
+<!-- TWEAKS -->
+<div id="tweaks">
+  <button id="tweaks-btn" title="테마 전환">☀</button>
+  <div id="tweaks-panel">
+    <p style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--ink)">테마</p>
+    <label><input type="checkbox" id="toggle-dark" checked onchange="switchTheme(this.checked)"> 다크 모드</label>
+    <label><input type="checkbox" id="toggle-nav" checked onchange="toggleNav(this.checked)"> 네비고이션 바 고정</label>
+  </div>
+</div>
+
+<script>
+// Theme toggle
+function switchTheme(dark){
+  document.body.classList.toggle('light',!dark);
+  document.getElementById('tweaks-btn').textContent = dark ? '☀' : '🌙';
+  localStorage.setItem('hermes-config-theme', dark?'dark':'light');
+}
+
+function toggleNav(on){
+  document.getElementById('nav').style.position = on ? 'fixed' : 'relative';
+  localStorage.setItem('hermes-config-nav', on?'fixed':'relative');
+}
+
+// Load saved preferences
+(function(){
+  const theme = localStorage.getItem('hermes-config-theme');
+  if(theme==='light'){ switchTheme(false); }
+  const nav = localStorage.getItem('hermes-config-nav');
+  if(nav==='relative'){ document.getElementById('nav').style.position='relative'; document.getElementById('toggle-nav').checked=false; document.getElementById('nav').style.top='0'; }
+})();
+
+// Tweaks panel
+document.getElementById('tweaks-btn').addEventListener('click', function(){
+  document.getElementById('tweaks-panel').classList.toggle('open');
+});
+
+// Close tweaks on outside click
+document.addEventListener('click', function(e){
+  const panel = document.getElementById('tweaks-panel');
+  const btn = document.getElementById('tweaks-btn');
+  if(!panel.contains(e.target) && !btn.contains(e.target)){
+    panel.classList.remove('open');
+  }
+});
+
+// Smooth scroll for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(function(a){
+  a.addEventListener('click',function(e){
+    e.preventDefault();
+    const target = document.querySelector(this.getAttribute('href'));
+    if(target){ target.scrollIntoView({behavior:'smooth'}); }
+  });
+});
+
+// Highlight current section in TOC on scroll
+(function(){
+  const sections = document.querySelectorAll('.sec[id]');
+  const tocLinks = document.querySelectorAll('.toc a');
+  const observer = new IntersectionObserver(function(entries){
+    entries.forEach(function(entry){
+      if(entry.isIntersecting){
+        tocLinks.forEach(function(l){ l.style.color=''; });
+        const active = document.querySelector('.toc a[href="#'+entry.target.id+'"]');
+        if(active) active.style.color='var(--accent)';
+      }
+    });
+  },{threshold:0.3,rootMargin:'-80px 0px -50% 0px'});
+  sections.forEach(function(s){ observer.observe(s); });
+})();
+</script>
+
+</body>
+</html>

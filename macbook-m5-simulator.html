@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>맥북 M5 — LLM 메모리/컨텍스트 시뮬레이터</title>
+<style>
+:root{
+     --bg:#0b0f18;
+     --card:#141c2b;
+     --card2:#1b2538;
+     --accent:#5b8cff;
+     --green:#34d399;
+     --yellow:#fbbf24;
+     --red:#f87171;
+     --pink:#f472b6;
+     --ink:#d4dce8;
+     --ink2:#8b97a8;
+     --ink3:#5a6678;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-family:'SF Pro Display',-apple-system,'Segoe UI',sans-serif;line-height:1.6;padding:20px 16px}
+h1{text-align:center;font-size:26px;font-weight:700;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+p.subtitle{text-align:center;color:var(--ink2);font-size:13px;margin-bottom:24px}
+.container{max-width:1200px;margin:0 auto}
+
+/* Dashboard controls */
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.control-group{display:flex;flex-direction:column;gap:4px}
+.control-group label{font-size:11px;color:var(--ink2);font-weight:600;text-transform:uppercase;letter-spacing:0.5px}
+.control-group select{padding:10px 36px 10px 12px;background:var(--card2);border:1px solid #2a3650;color:var(--ink);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;appearance:none;background-image:url('data:image/svg+xml;charset=UTF-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%228%22%3E%3Cpath d=%22M1 1l5 5 5-5%22 stroke=%22%238b97a8%22 stroke-width=%222%22 fill=%22none%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center;min-width:220px}
+.control-group select:hover{border-color:var(--accent)}
+.control-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(91,140,255,.2)}
+
+/* Top stats row */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.stat-card{background:var(--card);border-radius:12px;padding:16px;border:1px solid #1e2a42;text-align:center}
+.stat-card .label{font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
+.stat-card .value{font-size:24px;font-weight:700;color:var(--accent)}
+.stat-card .value.good{color:var(--green)}
+.stat-card .value.warn{color:var(--yellow)}
+.stat-card .value.bad{color:var(--red)}
+.stat-card .sub{font-size:11px;color:var(--ink3);margin-top:4px}
+
+/* Memory stacked bar */
+.mem-bar-wrap{background:#1a2235;border-radius:10px;overflow:hidden;height:36px;position:relative;margin-bottom:12px;display:flex}
+.mem-segment{height:100%;transition:width .4s ease;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;min-width:fit-content;cursor:default;position:relative}
+.mem-segment.os{background:#6b7280}
+.mem-segment.param{background:var(--accent)}
+.mem-segment.kv{background:var(--pink)}
+.mem-segment:hover{filter:brightness(1.15)}
+.mem-bar-label{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--ink2);z-index:2}
+.mem-markers{position:relative;height:8px;margin-bottom:8px}
+.mem-marker{position:absolute;font-size:10px;color:var(--ink3);transform:translateX(-50%)}
+.mem-marker span{display:block;text-align:center}
+
+/* Legend */
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;justify-content:center}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2)}
+.legend-dot{width:12px;height:12px;border-radius:3px;flex-shrink:0}
+.legend-dot.os{background:#6b7280}
+.legend-dot.param{background:var(--accent)}
+.legend-dot.kv{background:var(--pink)}
+
+/* KV Cache explanation */
+.kv-info{background:var(--card);border-radius:10px;padding:16px 20px;margin-bottom:16px;border:1px solid #1e2a42;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.kv-item{display:flex;flex-direction:column;align-items:center;gap:2px}
+.kv-item .kv-label{font-size:11px;color:var(--ink2)}
+.kv-item .kv-value{font-size:18px;font-weight:700;color:var(--accent)}
+.kv-item .kv-formula{font-size:10px;color:var(--ink3);text-align:center}
+
+/* Slider */
+.slider-section{background:var(--card);border-radius:12px;padding:18px 20px;margin-bottom:16px;border:1px solid #1e2a42}
+.slider-group label{display:block;font-size:12px;color:var(--ink2);margin-bottom:4px;font-weight:600}
+.slider-group .slider-val{text-align:right;font-size:16px;font-weight:700;color:var(--accent);margin-bottom:6px}
+input[type=range]{width:100%;height:6px;-webkit-appearance:none;background:#1e2a42;border-radius:3px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--accent);cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.3)}
+
+/* Bar chart */
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:11px}
+.bar-label{width:120px;flex-shrink:0;color:var(--ink2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-wrap{flex:1;background:#1a2235;border-radius:3px;overflow:hidden;height:18px}
+.bar-fill{height:100%;border-radius:3px;transition:width .3s ease;display:flex;align-items:center;padding-left:4px;font-size:10px;color:#fff;min-width:fit-content}
+
+/* Table */
+table{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+th,td{padding:6px 8px;text-align:center;border-bottom:1px solid #1e2a42}
+th{background:var(--card2);color:var(--ink2);font-weight:600;position:sticky;top:0}
+td{color:var(--ink)}
+td:nth-child(1){text-align:left;font-weight:600}
+table .good{color:var(--green)}
+table .warn{color:var(--yellow)}
+table .bad{color:var(--red)}
+.tag{display:inline-block;padding:1px 5px;border-radius:3px;font-size:9px;font-weight:600;margin-left:4px;vertical-align:middle}
+.tag.mlx{background:rgba(91,140,255,.15);color:#7cb3ff}
+.tag.moe{background:rgba(167,139,250,.15);color:#a78bfa}
+.tag.dense{background:rgba(52,211,153,.15);color:#34d399}
+.tag.coding{background:rgba(251,191,36,.15);color:#fbbf24}
+
+@media(max-width:800px){
+     .stats-row{grid-template-columns:repeat(2,1fr)}
+     .kv-info{grid-template-columns:1fr}
+     .slider-row{grid-template-columns:1fr}
+     .controls{flex-direction:column}
+     .control-group select{min-width:100%}
+}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>맥북 M5 — LLM 메모리/컨텍스트 시뮬레이터</h1>
+<p class="subtitle">모델·RAM 선택 → 컨텍스트 슬라이더로 메모리 사용량 실시간 확인</p>
+
+<!-- Controls -->
+<div class="controls">
+     <div class="control-group">
+         <label for="modelSelect">🤖 모델</label>
+         <select id="modelSelect"></select>
+     </div>
+     <div class="control-group">
+         <label for="bitSelect">🔢 양자화 비트</label>
+         <select id="bitSelect">
+             <option value="16" selected>16bit (BF16/FP16)</option>
+             <option value="8">8bit (MXFP8/Q8_0)</option>
+             <option value="4">4bit (NVFP4/Q4_K_M)</option>
+         </select>
+     </div>
+     <div class="control-group">
+         <label for="ramSelect">💾 맥북 RAM</label>
+         <select id="ramSelect"></select>
+     </div>
+</div>
+
+<!-- Top stats -->
+<div class="stats-row">
+     <div class="stat-card">
+         <div class="label">OS 기본 사용량</div>
+         <div class="value" id="osMem">—</div>
+         <div class="sub">macOS + 백그라운드 프로세스</div>
+     </div>
+     <div class="stat-card">
+         <div class="label">컨텍스트 슬라이더 최댓값 (80% 기준)</div>
+         <div class="value" id="maxCtx">—</div>
+         <div class="sub">OS+파라미터 제외 후 남은 여유</div>
+     </div>
+     <div class="stat-card">
+         <div class="label">KV 캐시 메모리</div>
+         <div class="value" id="kvSize">—</div>
+         <div class="sub" id="kvSub">토큰당 계산값</div>
+     </div>
+     <div class="stat-card">
+         <div class="label">총 사용 메모리</div>
+         <div class="value" id="totalMem">—</div>
+         <div class="sub" id="totalSub">RAM 대비 사용률</div>
+     </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+     <div class="legend-item"><span class="legend-dot os"></span>macOS 기본 (6~8GB)</div>
+     <div class="legend-item"><span class="legend-dot param"></span>모델 파라미터</div>
+     <div class="legend-item"><span class="legend-dot kv"></span>KV 캐시 (컨텍스트)</div>
+</div>
+
+<!-- Stacked memory bar -->
+<div class="mem-bar-wrap">
+     <div class="mem-segment os" id="osBar" style="width:0%"></div>
+     <div class="mem-segment param" id="paramBar" style="width:0%"></div>
+     <div class="mem-segment kv" id="kvBar" style="width:0%"></div>
+</div>
+<span class="mem-bar-label" id="memBarLabel"></span>
+<div class="mem-markers" id="memMarkers">
+     <div class="mem-marker" style="left:50%"><span>50%</span></div>
+     <div class="mem-marker" style="left:70%"><span>70%</span></div>
+     <div class="mem-marker" style="left:80%"><span>80% ← 권장 최대</span></div>
+     <div class="mem-marker" style="left:100%"><span>100%</span></div>
+</div>
+
+<!-- KV Cache explanation -->
+<div class="kv-info">
+     <div class="kv-item">
+         <div class="kv-label">KV 캐시 공식</div>
+         <div class="kv-value" style="font-size:13px">레이어×2×KV헤드×차원×비트÷8×토큰</div>
+         <div class="kv-formula" id="kvFormula"></div>
+     </div>
+     <div class="kv-item">
+         <div class="kv-label">토큰당开销</div>
+         <div class="kv-value" id="kvPerToken">—</div>
+         <div class="kv-formula">1토큰 추가 시 메모리 증가량</div>
+     </div>
+     <div class="kv-item">
+         <div class="kv-label">80% 임계</div>
+         <div class="kv-value" id="maxToken">—</div>
+         <div class="kv-formula">RAM×0.8 − OS − 파라미터 ÷ 토큰당 ÷ KV_PER_TOKEN</div>
+     </div>
+</div>
+
+<!-- Slider -->
+<div class="slider-section">
+     <div class="slider-group">
+         <label for="ctxSlider">📝 컨텍스트 토큰수 (클릭·드래그)</label>
+         <div class="slider-val" id="ctxValue">32,768 토큰</div>
+         <input type="range" min="1024" max="131072" step="1024" value="32768" id="ctxSlider">
+     </div>
+</div>
+
+<!-- Bar chart comparison -->
+<div style="background:var(--card);border-radius:12px;padding:16px 20px;margin-bottom:16px;border:1px solid #1e2a42">
+     <h2 style="font-size:14px;margin-bottom:10px;color:var(--accent)">모델별 메모리 비교 (KV 캐시 포함)</h2>
+     <div id="barChart"></div>
+</div>
+
+<!-- Detail table -->
+<div style="background:var(--card);border-radius:12px;padding:16px 20px;border:1px solid #1e2a42">
+     <h2 style="font-size:14px;margin-bottom:10px;color:var(--accent)">상세 스펙표</h2>
+     <div id="detailTable"></div>
+</div>
+</div>
+
+<script>
+// ===== MODEL DATA =====
+const MODELS = [
+     // === Qwen 3.6 27B ===
+     {
+        name: "Qwen 3.6 27B",
+        group: "Qwen 3.6 27B",
+        tags: ["dense"],
+        totalParams: 27.2,
+        activeParams: null,
+        layerCount: 28,
+        kvHeads: 8,
+        kvHeadDim: 128,
+        attnHeads: 32,
+        hiddenSize: 4096,
+        desc: "Dense 모델"
+     },
+     // === Qwen 3.6 35B (A3B) ===
+     {
+        name: "Qwen 3.6 35B-A3B",
+        group: "Qwen 3.6 35B",
+        tags: ["moe"],
+        totalParams: 35.6,
+        activeParams: 3.6,
+        layerCount: 36,
+        kvHeads: 4,
+        kvHeadDim: 128,
+        attnHeads: 28,
+        hiddenSize: 4096,
+        numExperts: 128,
+        expertsPerToken: 8,
+        desc: "MoE, 35.6B total / 3.6B active"
+     },
+     // === Gemma 4 e2b ===
+     {
+        name: "Gemma 4 e2b",
+        group: "Gemma 4",
+        tags: ["moe"],
+        totalParams: 2,
+        activeParams: 2,
+        layerCount: 26,
+        kvHeads: 8,
+        kvHeadDim: 128,
+        attnHeads: 8,
+        hiddenSize: 2048,
+        desc: "MoE, Effective 2B"
+     },
+     // === Gemma 4 e4b ===
+     {
+        name: "Gemma 4 e4b",
+        group: "Gemma 4",
+        tags: ["moe"],
+        totalParams: 4,
+        activeParams: 4,
+        layerCount: 26,
+        kvHeads: 8,
+        kvHeadDim: 128,
+        attnHeads: 8,
+        hiddenSize: 2048,
+        desc: "MoE, Effective 4B"
+     },
+     // === Gemma 4 26b ===
+     {
+        name: "Gemma 4 26b",
+        group: "Gemma 4",
+        tags: ["moe"],
+        totalParams: 26,
+        activeParams: 4,
+        layerCount: 44,
+        kvHeads: 8,
+        kvHeadDim: 128,
+        attnHeads: 32,
+        hiddenSize: 3072,
+        desc: "MoE, 26B/4B active, 44 레이어"
+     },
+     // === Gemma 4 31b ===
+     {
+        name: "Gemma 4 31b",
+        group: "Gemma 4",
+        tags: ["dense"],
+        totalParams: 31,
+        activeParams: 31,
+        layerCount: 48,
+        kvHeads: 8,
+        kvHeadDim: 128,
+        attnHeads: 32,
+        hiddenSize: 3072,
+        desc: "Dense, 31B, 48 레이어"
+     }
+];
+
+// ===== MACBOOK RAM OPTIONS =====
+const MACBOOK_RAM_GROUPS = {
+     "M5 Pro": [24, 48, 64],
+     "M5 Max": [36, 48, 64, 128]
+};
+
+// ===== OS Memory overhead estimates (macOS on Apple Silicon, unified memory) =====
+// From wiki: macOS + 기본 프로세스 + Ollama daemon 등 ≈ 6~8GB
+// RAM이 적을수록 OS 비중이 큼
+function getOsOverhead(ram) {
+     // RAM이 적을수록 OS가 상대적으로 더 많이 씀
+     if (ram <= 24) return 7;    // 24GB: OS가 큰 비중
+     if (ram <= 36) return 6.5;  // 36GB
+     if (ram <= 48) return 6;    // 48GB
+     return 6;                    // 64GB 이상: 6GB 정도
+}
+
+// ===== STATE =====
+let selectedModel = MODELS[0];
+let selectedRam = 64;
+let ctxTokens = 32768;
+let quantBits = 16;
+
+// ===== INIT =====
+function init() {
+     renderDropdowns();
+     bindEvents();
+     updateDisplay();
+}
+
+function renderDropdowns() {
+     // Model dropdown - grouped by family
+     const modelSel = document.getElementById('modelSelect');
+     let modelHtml = '';
+     let currentGroup = '';
+     MODELS.forEach((m, i) => {
+        if (m.group !== currentGroup) {
+            if (currentGroup) modelHtml += '</optgroup>';
+            modelHtml += `<optgroup label="${m.group}">`;
+            currentGroup = m.group;
+         }
+        const isActive = m === selectedModel;
+        modelHtml += `<option value="${i}" ${isActive?'selected':''}>${m.name}</option>`;
+     });
+     modelHtml += '</optgroup>';
+     modelSel.innerHTML = modelHtml;
+
+     // RAM dropdown - grouped by chip
+     const ramSel = document.getElementById('ramSelect');
+     let ramHtml = '';
+     for (const [chip, ras] of Object.entries(MACBOOK_RAM_GROUPS)) {
+        ramHtml += `<optgroup label="${chip}">`;
+        ras.forEach(r => {
+            const isActive = r === selectedRam;
+            ramHtml += `<option value="${r}" ${isActive?'selected':''}>${r}GB</option>`;
+         });
+        ramHtml += '</optgroup>';
+     }
+     ramSel.innerHTML = ramHtml;
+}
+
+// ===== EVENTS =====
+function bindEvents() {
+     document.getElementById('modelSelect').addEventListener('change', function() {
+        selectedModel = MODELS[parseInt(this.value)];
+        quantBits = 16;
+        document.getElementById('bitSlider').value = 16;
+        document.getElementById('bitSelect').value = '16';
+        updateBitDisplay();
+        updateDisplay();
+     });
+     document.getElementById('ramSelect').addEventListener('change', function() {
+        selectedRam = parseInt(this.value);
+        updateDisplay();
+     });
+     document.getElementById('ctxSlider').addEventListener('input', function() {
+        ctxTokens = parseInt(this.value);
+        updateCtxDisplay();
+        updateDisplay();
+     });
+     document.getElementById('bitSlider').addEventListener('input', function() {
+        quantBits = parseInt(this.value);
+        document.getElementById('bitSelect').value = String(quantBits);
+        updateBitDisplay();
+        updateDisplay();
+     });
+     document.getElementById('bitSelect').addEventListener('change', function() {
+        quantBits = parseInt(this.value);
+        document.getElementById('bitSlider').value = quantBits;
+        updateBitDisplay();
+        updateDisplay();
+     });
+}
+
+function updateCtxDisplay() {
+     document.getElementById('ctxValue').textContent = ctxTokens.toLocaleString() + ' 토큰';
+}
+
+function updateBitDisplay() {
+     const labels = {4:'4bit (NVFP4/Q4)', 8:'8bit (MXFP8)', 16:'16bit (BF16)'};
+     document.getElementById('bitValue').textContent = labels[quantBits] || `${quantBits}bit`;
+}
+
+// ===== CALCULATIONS =====
+function calcKVCache(model, ctx, bits) {
+     const bpe = bits / 8;
+     const kvPerToken = 2 * model.kvHeads * model.kvHeadDim * bpe;
+     const totalBytes = kvPerToken * model.layerCount * ctx;
+     return {
+        totalGB: totalBytes / (1024**3),
+        perTokenKB: kvPerToken / 1024,
+        kvPerToken: kvPerToken,
+        totalBytes
+     };
+}
+
+function calcParamMemory(model, bits) {
+     const bpe = bits / 8;
+     const totalGB = model.totalParams * 1e9 * bpe / (1024**3);
+     const activeGB = model.activeParams ? model.activeParams * 1e9 * bpe / (1024**3) : null;
+     return { totalGB, activeGB };
+}
+
+function calcMaxContext(model, ram, bits) {
+     const os = getOsOverhead(ram);
+     const targetBytes = ram * (1024**3) * 0.8;
+     const bpe = bits / 8;
+     const paramBytes = model.totalParams * 1e9 * bpe;
+     const kvBytesPerToken = 2 * model.kvHeads * model.kvHeadDim * bpe * model.layerCount;
+     if (kvBytesPerToken <= 0) return 0;
+     const remaining = targetBytes - paramBytes - os * (1024**3);
+     if (remaining <= 0) return 0;
+     return Math.floor(remaining / kvBytesPerToken);
+}
+
+// ===== UPDATE DISPLAY =====
+function updateDisplay() {
+     const os = getOsOverhead(selectedRam);
+     const kv = calcKVCache(selectedModel, ctxTokens, quantBits);
+     const param = calcParamMemory(selectedModel, quantBits);
+     const total = os + kv.totalGB + param.totalGB;
+     const pct = (total / selectedRam) * 100;
+     const maxCtx = calcMaxContext(selectedModel, selectedRam, quantBits);
+     const fmtNum = (b) => {
+        if (b >= 1e9) return (b/1e9).toFixed(1)+'B';
+        if (b >= 1e6) return (b/1e6).toFixed(0)+'M';
+        return (b/1024).toFixed(0)+'K';
+     };
+
+     // Top stats
+     const ctxStr = ctxTokens.toLocaleString();
+     document.getElementById('osMem').textContent = os.toFixed(1) + ' GB';
+     document.getElementById('osMem').className = 'value';
+     document.getElementById('osMem').style.color = '#6b7280';
+
+     const maxCtxEl = document.getElementById('maxCtx');
+     maxCtxEl.textContent = maxCtx.toLocaleString() + ' 토큰';
+
+     // KV
+     document.getElementById('kvSize').textContent = kv.totalGB.toFixed(1) + ' GB';
+     document.getElementById('kvSize').className = 'value ' + (pct > 95 ? 'bad' : pct > 80 ? 'warn' : 'good');
+     document.getElementById('kvSub').textContent = `토큰당 ${fmtNum(kv.kvPerToken)} (${kv.perTokenKB.toFixed(2)}KB/토큰)`;
+
+     // Param memory display
+     document.getElementById('paramSub').textContent = `${selectedModel.totalParams}B × ${quantBits}bit÷8`;
+
+     // Total
+     const totalEl = document.getElementById('totalMem');
+     totalEl.textContent = total.toFixed(1) + ' GB';
+     totalEl.className = 'value ' + (pct > 95 ? 'bad' : pct > 80 ? 'warn' : 'good');
+     document.getElementById('totalSub').textContent = `RAM ${selectedRam}GB 중 ${pct.toFixed(1)}% · 여유 ${(selectedRam - total).toFixed(1)}GB`;
+
+     // Stacked bar
+     const totalForBar = Math.max(total, 0.01);
+     const osPct = Math.min((os / (selectedRam * 100)) * 100, 100);
+     const paramPct = Math.min((param.totalGB / (selectedRam * 100)) * 100, 100);
+     const kvPct = Math.min((kv.totalGB / (selectedRam * 100)) * 100, 100);
+
+     const osBarEl = document.getElementById('osBar');
+     osBarEl.style.width = osPct + '%';
+     osBarEl.textContent = osPct > 5 ? os.toFixed(1)+'GB' : '';
+
+     const paramBarEl = document.getElementById('paramBar');
+     paramBarEl.style.width = paramPct + '%';
+     paramBarEl.textContent = paramPct > 5 ? param.totalGB.toFixed(1)+'GB' : '';
+
+     const kvBarEl = document.getElementById('kvBar');
+     kvBarEl.style.width = kvPct + '%';
+     kvBarEl.textContent = kvPct > 5 ? kv.totalGB.toFixed(1)+'GB' : '';
+
+     // Bar label
+     document.getElementById('memBarLabel').textContent =
+          `나머지 ${Math.max(0,(selectedRam - total)).toFixed(1)}GB · OS 6~8GB 포함`;
+
+     // Update slider max
+     const ctxSlider = document.getElementById('ctxSlider');
+     ctxSlider.max = Math.max(maxCtx, 1024);
+     if (ctxTokens > maxCtx) ctxTokens = maxCtx;
+     updateCtxDisplay();
+
+     // KV formula display
+     document.getElementById('kvFormula').textContent =
+         `${selectedModel.layerCount} × 2 × ${selectedModel.kvHeads} × ${selectedModel.kvHeadDim} × ${quantBits}/8 × ${ctxStr}`;
+
+     document.getElementById('kvPerToken').textContent = kv.perTokenKB.toFixed(2) + ' KB';
+     document.getElementById('maxToken').textContent = maxCtx.toLocaleString();
+
+     // Bar chart + table
+     updateBarChart(os);
+}
+
+// ===== BAR CHART =====
+function updateBarChart(os) {
+     const container = document.getElementById('barChart');
+     const calcTable = MODELS.map(m => {
+        const kv = calcKVCache(m, ctxTokens, quantBits);
+        const param = calcParamMemory(m, quantBits);
+        const total = os + kv.totalGB + param.totalGB;
+        const pctVal = (total / selectedRam) * 100;
+        const color = pctVal > 95 ? 'var(--red)' : pctVal > 70 ? 'var(--yellow)' : 'var(--green)';
+        return { ...m, kv: kv.totalGB, param: param.totalGB, os, total, pctVal, color };
+     });
+     calcTable.sort((a, b) => b.total - a.total);
+     const maxTotal = Math.max(...calcTable.map(c => c.total), 1);
+
+     let html = '';
+     calcTable.forEach(c => {
+        const width = Math.min((c.total / maxTotal) * 100, 100);
+        const tags = c.tags.map(t => `<span class="tag ${t}" style="font-size:8px;padding:1px 3px">${t.toUpperCase()}</span>`).join('');
+        html += `<div class="bar-row">
+             <div class="bar-label">${c.name}${tags}</div>
+             <div class="bar-wrap">
+                 <div class="bar-fill" style="width:${width}%;background:${c.color}">${width > 15 ? c.total.toFixed(1)+'GB' : ''}</div>
+             </div>
+             <div class="bar-value" style="color:${c.color}">${c.pctVal.toFixed(0)}%</div>
+         </div>`;
+     });
+     container.innerHTML = html;
+
+     // Detail table
+     renderDetailTable(calcTable);
+}
+
+// ===== DETAIL TABLE =====
+function renderDetailTable(calculations) {
+     const container = document.getElementById('detailTable');
+     let html = `<table>
+         <tr>
+             <th>모델</th><th>총 파라미터</th><th>활성 파라미터</th>
+             <th>레이어</th><th>KV 헤드</th><th>비트</th><th>RAM (${selectedRam}GB)</th>
+             <th>OS</th><th>KV 캐시</th><th>파라미터</th><th>총계</th><th>80% 한계</th><th>사용률</th><th>판단</th>
+         </tr>`;
+
+     calculations.forEach(c => {
+        const maxCtx = calcMaxContext(c, selectedRam, quantBits);
+        let status = '';
+        if (c.pctVal > 95) status = '<span class="bad">⛔ 초과</span>';
+        else if (c.pctVal > 70) status = '<span class="warn">⚡ 사용</span>';
+        else status = '<span class="good">✅ 안전</span>';
+
+        html += `<tr>
+             <td>${c.name}</td>
+             <td>${c.totalParams}B</td>
+             <td>${c.activeParams ? c.activeParams+'B' : '—'}</td>
+             <td>${c.layerCount}</td>
+             <td>${c.kvHeads}</td>
+             <td>${quantBits}bit</td>
+             <td>${selectedRam}GB</td>
+             <td style="color:#6b7280">${c.os.toFixed(1)}GB</td>
+             <td>${c.kv.toFixed(2)}GB</td>
+             <td>${c.param.toFixed(2)}GB</td>
+             <td style="font-weight:700;color:${c.pctVal > 95 ? 'var(--red)' : c.pctVal > 70 ? 'var(--yellow)' : 'var(--green)'}">${c.total.toFixed(1)}GB</td>
+             <td>${maxCtx.toLocaleString()}토큰</td>
+             <td>${c.pctVal.toFixed(1)}%</td>
+             <td>${status}</td>
+         </tr>`;
+     });
+     html += '</table>';
+     container.innerHTML = html;
+}
+
+// Init
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+} else {
+    init();
+}
+</script>
+</body>
+</html>

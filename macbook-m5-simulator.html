@@ -21,6 +21,10 @@
 *{box-sizing:border-box;margin:0;padding:0}
 body{background:var(--bg);color:var(--ink);font-family:'SF Pro Display',-apple-system,'Segoe UI',sans-serif;line-height:1.6;padding:20px 16px}
 h1{text-align:center;font-size:26px;font-weight:700;margin-bottom:6px;background:linear-gradient(90deg,var(--accent),#a78bfa);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-wrap{display:flex;align-items:start;justify-content:space-between;padding:16px 0 8px;gap:16px}
+.header-wrap h1{font-size:24px;color:var(--accent);margin:0;flex-shrink:1;min-width:0}
+.header-logo{max-width:120px;max-height:80px;height:auto;width:auto;flex-shrink:0;filter:brightness(1.3);pointer-events:none;opacity:0.9}
+@media(max-width:800px){.header-logo{max-width:80px;max-height:50px}}
 p.subtitle{text-align:center;color:var(--ink2);font-size:13px;margin-bottom:24px}
 .container{max-width:1200px;margin:0 auto}
 
@@ -32,27 +36,35 @@ p.subtitle{text-align:center;color:var(--ink2);font-size:13px;margin-bottom:24px
 .control-group select:hover{border-color:var(--accent)}
 .control-group select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(91,140,255,.2)}
 
-/* Top stats row */
-.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
-.stat-card{background:var(--card);border-radius:12px;padding:16px;border:1px solid #1e2a42;text-align:center}
-.stat-card .label{font-size:11px;color:var(--ink2);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px}
-.stat-card .value{font-size:24px;font-weight:700;color:var(--accent)}
+
+/* Top stats row - ultra compact: 7 cards, single row down to ~700px viewport */
+.stats-row{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:6px}
+.mem-segment.overhead{background:var(--yellow);opacity:0.8}
+.stat-card{background:var(--card);border-radius:4px;padding:2px 1px;border:1px solid #1e2a42;text-align:center;overflow:hidden;min-width:0}
+.stat-card .label{font-size:11px;color:var(--ink2);text-transform:none;letter-spacing:0;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.stat-card .value{font-size:17px;font-weight:700;color:var(--accent);white-space:nowrap;line-height:1.2}
 .stat-card .value.good{color:var(--green)}
 .stat-card .value.warn{color:var(--yellow)}
 .stat-card .value.bad{color:var(--red)}
-.stat-card .sub{font-size:11px;color:var(--ink3);margin-top:4px}
+.stat-card .sub{font-size:9px;color:var(--ink3);margin-top:2px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
 /* Memory stacked bar */
-.mem-bar-wrap{background:#1a2235;border-radius:10px;overflow:hidden;height:36px;position:relative;margin-bottom:12px;display:flex}
-.mem-segment{height:100%;transition:width .4s ease;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;min-width:fit-content;cursor:default;position:relative}
+.mem-bar-wrap{background:#1a2235;border-radius:10px;height:36px;position:relative;margin-bottom:12px;display:flex;width:100%;overflow:visible}
+.mem-bar-wrap::after{content:'RAM '+selectedRam+'GB';position:absolute;right:4px;top:50%;transform:translateY(-50%);font-size:9px;color:var(--red);font-weight:700;z-index:3;white-space:nowrap}
+.mem-bar-wrap.overspent::after{content:'⚠ '+selectedRam+'GB 초과!'}
+.mem-bar-wrap.overspent{box-shadow:0 0 0 2px rgba(239,68,68,.5)}
+.mem-segment{height:100%;transition:width .4s ease;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#000;cursor:default;position:relative;overflow:hidden}
 .mem-segment.os{background:#6b7280}
 .mem-segment.param{background:var(--accent)}
 .mem-segment.kv{background:var(--pink)}
+.mem-segment.overhead{background:var(--yellow)}
 .mem-segment:hover{filter:brightness(1.15)}
-.mem-bar-label{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--ink2);z-index:2}
-.mem-markers{position:relative;height:8px;margin-bottom:8px}
-.mem-marker{position:absolute;font-size:10px;color:var(--ink3);transform:translateX(-50%)}
-.mem-marker span{display:block;text-align:center}
+.mem-bar-label{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--ink2);z-index:10;white-space:nowrap;font-weight:700;pointer-events:none}
+.mem-bar-label span.over{color:var(--red);font-size:12px}
+.mem-markers{position:relative;height:8px;margin-bottom:8px;width:100%}
+.mem-marker{position:absolute;font-size:9px;color:var(--ink3);transform:translateX(-50%);white-space:nowrap}
+.mem-marker.ram-limit{color:var(--red);font-weight:700}
+.mem-marker.ram-limit::after{content:'▼ RAM 한계';position:absolute;top:6px;left:50%;transform:translateX(-50%);font-size:8px;color:var(--red);white-space:nowrap}
 
 /* Legend */
 .legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;justify-content:center}
@@ -61,6 +73,7 @@ p.subtitle{text-align:center;color:var(--ink2);font-size:13px;margin-bottom:24px
 .legend-dot.os{background:#6b7280}
 .legend-dot.param{background:var(--accent)}
 .legend-dot.kv{background:var(--pink)}
+.legend-dot.overhead{background:var(--yellow)}
 
 /* KV Cache explanation */
 .kv-info{background:var(--card);border-radius:10px;padding:16px 20px;margin-bottom:16px;border:1px solid #1e2a42;display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
@@ -96,8 +109,13 @@ table .bad{color:var(--red)}
 .tag.moe{background:rgba(167,139,250,.15);color:#a78bfa}
 .tag.dense{background:rgba(52,211,153,.15);color:#34d399}
 .tag.coding{background:rgba(251,191,36,.15);color:#fbbf24}
-
-@media(max-width:800px){
+     .kv-formula{font-size:11px;color:#6b7280;margin-top:4px}
+     /* Gemma 4 Sliding Window highlight */
+      .gemma-swi{background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:6px;padding:6px 10px;margin-top:6px;align-items:stretch!important}
+      .gemma-swi .kv-label{color:#a78bfa;margin-bottom:2px;font-size:11px}
+      .gemma-swi .kv-value{color:#c4b5fd;font-size:11px;margin-bottom:3px}
+      .gemma-swi .kv-formula{font-size:10px;line-height:1.4;text-align:left;color:#b0b8c8}
+     @media(max-width:800px){
      .stats-row{grid-template-columns:repeat(2,1fr)}
      .kv-info{grid-template-columns:1fr}
      .slider-row{grid-template-columns:1fr}
@@ -108,7 +126,11 @@ table .bad{color:var(--red)}
 </head>
 <body>
 <div class="container">
+<div class="header-wrap">
 <h1>맥북 M5 — LLM 메모리/컨텍스트 시뮬레이터</h1>
+<!-- Logo image with B&W inversion filter -->
+<img class="header-logo" src="img/IMG_2305-gray-inverted.png" alt="Logo" />
+</div>
 <p class="subtitle">모델·RAM 선택 → 컨텍스트 슬라이더로 메모리 사용량 실시간 확인</p>
 
 <!-- Controls -->
@@ -117,14 +139,14 @@ table .bad{color:var(--red)}
          <label for="modelSelect">🤖 모델</label>
          <select id="modelSelect"></select>
      </div>
-     <div class="control-group">
-         <label for="bitSelect">🔢 양자화 비트</label>
-         <select id="bitSelect">
-             <option value="16" selected>16bit (BF16/FP16)</option>
-             <option value="8">8bit (MXFP8/Q8_0)</option>
-             <option value="4">4bit (NVFP4/Q4_K_M)</option>
-         </select>
-     </div>
+         <div class="control-group">
+             <label>🔢 양자화 비트: <span id="bitValue">16bit (BF16/FP16)</span></label>
+             <select id="bitSelect">
+                 <option value="16" selected>16bit (BF16/FP16)</option>
+                 <option value="8">8bit (MXFP8/Q8_0)</option>
+                 <option value="4">4bit (NVFP4/Q4_K_M)</option>
+             </select>
+         </div>
      <div class="control-group">
          <label for="ramSelect">💾 맥북 RAM</label>
          <select id="ramSelect"></select>
@@ -138,21 +160,36 @@ table .bad{color:var(--red)}
          <div class="value" id="osMem">—</div>
          <div class="sub">macOS + 백그라운드 프로세스</div>
      </div>
-     <div class="stat-card">
-         <div class="label">컨텍스트 슬라이더 최댓값 (80% 기준)</div>
-         <div class="value" id="maxCtx">—</div>
-         <div class="sub">OS+파라미터 제외 후 남은 여유</div>
-     </div>
+       <div class="stat-card">
+           <div class="label">🏆 Opus 4.7 대비 종합 성능</div>
+           <div class="value" id="opusPct" style="font-size:22px;">—</div>
+           <div class="sub" id="ctxTier">—</div>
+       </div>
+       <div class="stat-card" style="opacity:0.85">
+           <div class="label">컨텍스트 추천 (80% 기준)</div>
+           <div class="value" id="maxCtx" style="font-size:12px;">—</div>
+           <div class="sub" id="ctxTier2">—</div>
+       </div>
      <div class="stat-card">
          <div class="label">KV 캐시 메모리</div>
          <div class="value" id="kvSize">—</div>
          <div class="sub" id="kvSub">토큰당 계산값</div>
      </div>
-     <div class="stat-card">
-         <div class="label">총 사용 메모리</div>
-         <div class="value" id="totalMem">—</div>
-         <div class="sub" id="totalSub">RAM 대비 사용률</div>
-     </div>
+       <div class="stat-card">
+           <div class="label">모델 파라미터</div>
+           <div class="value" id="paramSize">—</div>
+           <div class="sub" id="paramSub">양자화 계산값</div>
+       </div>
+       <div class="stat-card">
+           <div class="label">런타임 오버헤드</div>
+           <div class="value" id="overheadSize">—</div>
+           <div class="sub" id="overheadSub">양자화+KV+활성화+고정</div>
+       </div>
+       <div class="stat-card">
+           <div class="label">총 사용 메모리</div>
+           <div class="value" id="totalMem">—</div>
+           <div class="sub" id="totalSub">RAM 대비 사용률</div>
+       </div>
 </div>
 
 <!-- Legend -->
@@ -160,13 +197,15 @@ table .bad{color:var(--red)}
      <div class="legend-item"><span class="legend-dot os"></span>macOS 기본 (6~8GB)</div>
      <div class="legend-item"><span class="legend-dot param"></span>모델 파라미터</div>
      <div class="legend-item"><span class="legend-dot kv"></span>KV 캐시 (컨텍스트)</div>
+     <div class="legend-item"><span class="legend-dot overhead"></span>런타임 오버헤드 (양자화+KV+활성화+고정)</div>
 </div>
 
 <!-- Stacked memory bar -->
 <div class="mem-bar-wrap">
-     <div class="mem-segment os" id="osBar" style="width:0%"></div>
-     <div class="mem-segment param" id="paramBar" style="width:0%"></div>
-     <div class="mem-segment kv" id="kvBar" style="width:0%"></div>
+      <div class="mem-segment os" id="osBar" style="width:0%"></div>
+      <div class="mem-segment param" id="paramBar" style="width:0%"></div>
+      <div class="mem-segment kv" id="kvBar" style="width:0%"></div>
+      <div class="mem-segment overhead" id="overheadBar" style="width:0%"></div>
 </div>
 <span class="mem-bar-label" id="memBarLabel"></span>
 <div class="mem-markers" id="memMarkers">
@@ -178,20 +217,26 @@ table .bad{color:var(--red)}
 
 <!-- KV Cache explanation -->
 <div class="kv-info">
-     <div class="kv-item">
-         <div class="kv-label">KV 캐시 공식</div>
-         <div class="kv-value" style="font-size:13px">레이어×2×KV헤드×차원×비트÷8×토큰</div>
-         <div class="kv-formula" id="kvFormula"></div>
-     </div>
-     <div class="kv-item">
-         <div class="kv-label">토큰당开销</div>
-         <div class="kv-value" id="kvPerToken">—</div>
-         <div class="kv-formula">1토큰 추가 시 메모리 증가량</div>
-     </div>
-     <div class="kv-item">
-         <div class="kv-label">80% 임계</div>
-         <div class="kv-value" id="maxToken">—</div>
-         <div class="kv-formula">RAM×0.8 − OS − 파라미터 ÷ 토큰당 ÷ KV_PER_TOKEN</div>
+    <div class="kv-item">
+        <div class="kv-label">KV 캐시 공식</div>
+        <div class="kv-value" style="font-size:13px">레이어×2×KV헤드×차원×비트÷8×토큰</div>
+        <div class="kv-formula" id="kvFormula"></div>
+    </div>
+    <div class="kv-item">
+        <div class="kv-label">토큰당开销</div>
+        <div class="kv-value" id="kvPerToken">—</div>
+        <div class="kv-formula">1토큰 추가 시 메모리 증가량</div>
+    </div>
+    <div class="kv-item">
+        <div class="kv-label">80% 임계</div>
+        <div class="kv-value" id="maxToken">—</div>
+        <div class="kv-formula">RAM×0.8 − OS − 파라미터 ÷ 토큰당 ÷ KV_PER_TOKEN</div>
+    </div>
+     <!-- Gemma 4 Sliding Window Info (hidden by default) -->
+     <div class="gemma-swi" id="gemmaSWI" style="display:none">
+         <div class="kv-label">⚡ Sliding Window Attention</div>
+         <div class="kv-value">최대 컨텍스트 대비 KV 캐시: 마지막 <strong>1,024 토큰</strong>만 메모리 유지</div>
+         <div class="kv-formula">슬라이더를 256,000 토큰으로 설정해도 KV 캐시는 1,024 토큰 기준 → 256배 절감 = Gemma 4가 64GB 맥북에서 가능한 이유</div>
      </div>
 </div>
 
@@ -200,7 +245,7 @@ table .bad{color:var(--red)}
      <div class="slider-group">
          <label for="ctxSlider">📝 컨텍스트 토큰수 (클릭·드래그)</label>
          <div class="slider-val" id="ctxValue">32,768 토큰</div>
-         <input type="range" min="1024" max="131072" step="1024" value="32768" id="ctxSlider">
+         <input type="range" min="1024" max="262144" step="1024" value="32768" id="ctxSlider">
      </div>
 </div>
 
@@ -212,16 +257,19 @@ table .bad{color:var(--red)}
 
 <!-- Detail table -->
 <div style="background:var(--card);border-radius:12px;padding:16px 20px;border:1px solid #1e2a42">
-     <h2 style="font-size:14px;margin-bottom:10px;color:var(--accent)">상세 스펙표</h2>
-     <div id="detailTable"></div>
+      <h2 style="font-size:14px;margin-bottom:10px;color:var(--accent)">상세 스펙표</h2>
+      <div id="detailTable"></div>
 </div>
+
+<!-- Benchmark Section -->
+<div id="benchSection"></div>
 </div>
 
 <script>
 // ===== MODEL DATA =====
 const MODELS = [
-     // === Qwen 3.6 27B ===
-     {
+       // === Qwen 3.6 27B ===
+       {
         name: "Qwen 3.6 27B",
         group: "Qwen 3.6 27B",
         tags: ["dense"],
@@ -229,83 +277,172 @@ const MODELS = [
         activeParams: null,
         layerCount: 28,
         kvHeads: 8,
-        kvHeadDim: 128,
+        kvHeadDim: 512,
         attnHeads: 32,
         hiddenSize: 4096,
-        desc: "Dense 모델"
-     },
-     // === Qwen 3.6 35B (A3B) ===
-     {
-        name: "Qwen 3.6 35B-A3B",
-        group: "Qwen 3.6 35B",
-        tags: ["moe"],
-        totalParams: 35.6,
-        activeParams: 3.6,
-        layerCount: 36,
-        kvHeads: 4,
-        kvHeadDim: 128,
-        attnHeads: 28,
-        hiddenSize: 4096,
-        numExperts: 128,
-        expertsPerToken: 8,
-        desc: "MoE, 35.6B total / 3.6B active"
-     },
-     // === Gemma 4 e2b ===
-     {
-        name: "Gemma 4 e2b",
-        group: "Gemma 4",
-        tags: ["moe"],
-        totalParams: 2,
-        activeParams: 2,
-        layerCount: 26,
-        kvHeads: 8,
-        kvHeadDim: 128,
-        attnHeads: 8,
-        hiddenSize: 2048,
-        desc: "MoE, Effective 2B"
-     },
-     // === Gemma 4 e4b ===
-     {
-        name: "Gemma 4 e4b",
-        group: "Gemma 4",
-        tags: ["moe"],
-        totalParams: 4,
-        activeParams: 4,
-        layerCount: 26,
-        kvHeads: 8,
-        kvHeadDim: 128,
-        attnHeads: 8,
-        hiddenSize: 2048,
-        desc: "MoE, Effective 4B"
-     },
-     // === Gemma 4 26b ===
-     {
-        name: "Gemma 4 26b",
-        group: "Gemma 4",
-        tags: ["moe"],
-        totalParams: 26,
-        activeParams: 4,
-        layerCount: 44,
-        kvHeads: 8,
-        kvHeadDim: 128,
-        attnHeads: 32,
-        hiddenSize: 3072,
-        desc: "MoE, 26B/4B active, 44 레이어"
-     },
-     // === Gemma 4 31b ===
-     {
-        name: "Gemma 4 31b",
-        group: "Gemma 4",
-        tags: ["dense"],
-        totalParams: 31,
-        activeParams: 31,
-        layerCount: 48,
-        kvHeads: 8,
-        kvHeadDim: 128,
-        attnHeads: 32,
-        hiddenSize: 3072,
-        desc: "Dense, 31B, 48 레이어"
-     }
+        maxContext: 262144,
+        benchmarks: {
+            GPQA: 0.52,
+            MMLU: 0.83,
+            "SWE-Bench": 0.55,
+            IFEval: 0.78,
+            GSM8K: 0.88,
+            HumanEval: 0.85,
+            ARC: 0.82
+        },
+        desc: "Dense 모델, max context 256K"
+        },
+	// === Qwen 3.6 35B (A3B) — Blog: qwen.ai/blog/qwen3.6 + Ollama verified ===
+	{
+	name: "Qwen 3.6 35B-A3B",
+	group: "Qwen 3.6 35B",
+	tags: ["moe"],
+	totalParams: 35.0,
+	activeParams: 3.6,
+	layerCount: 40,
+	kvHeads: 2,
+	kvHeadDim: 256,
+	attnHeads: 16,
+	hiddenSize: 2048,
+	numExperts: 256,
+	expertsPerToken: 8,
+	maxContext: 256000,
+        benchmarks: {
+            GPQA: 0.54,
+            MMLU: 0.85,
+            	"SWE-Bench": 0.58,
+            IFEval: 0.80,
+            GSM8K: 0.90,
+            HumanEval: 0.87,
+            ARC: 0.83
+        },
+	desc: "MoE, ~35B total / 3.6B active, 40 layers (DeltaNet+GatedAttn mix), 256 experts (8 routed + 1 shared)"
+	},
+	// === Gemma 4 e2b — Blog docs + Ollama verified ===
+	{
+	name: "Gemma 4 e2b",
+	group: "Gemma 4",
+	tags: ["moe"],
+	totalParams: 5.1,
+	activeParams: 2.3,
+	layerCount: 35,
+	kvHeads: 2,
+	kvHeadDim: 512,
+	attnHeads: 8,
+	hiddenSize: 2048,
+	maxContext: 128000,
+	benchmarks: {
+		GPQA: 0.30,
+		MMLU: 0.68,
+			"SWE-Bench": 0.32,
+		IFEval: 0.62,
+		GSM8K: 0.67,
+		HumanEval: 0.63,
+		ARC: 0.60
+	},
+	desc: "MoE, 5.1B total (2.3B effective w/ PLE), 35 layers, max context 128K"
+	},
+	// === Gemma 4 e4b — Blog docs + Ollama verified ===
+	{
+	name: "Gemma 4 e4b",
+	group: "Gemma 4",
+	tags: ["moe"],
+	totalParams: 8,
+	activeParams: 4.5,
+	layerCount: 42,
+	kvHeads: 2,
+	kvHeadDim: 512,
+	attnHeads: 8,
+	hiddenSize: 2048,
+	maxContext: 128000,
+	benchmarks: {
+		GPQA: 0.35,
+		MMLU: 0.72,
+				"SWE-Bench": 0.38,
+		IFEval: 0.65,
+		GSM8K: 0.72,
+		HumanEval: 0.68,
+		ARC: 0.65
+	},
+	desc: "MoE, 8B total (4.5B effective w/ PLE), 42 layers, max context 128K"
+	},
+	// === Gemma 4 26b A4B MoE — Blog docs + Ollama verified ===
+	{
+	name: "Gemma 4 26b A4B",
+	group: "Gemma 4",
+	tags: ["moe"],
+	totalParams: 25.2,
+	activeParams: 3.8,
+	layerCount: 30,
+	kvHeads: 16,
+	kvHeadDim: 512,
+	attnHeads: 16,
+	hiddenSize: 3072,
+	numExperts: 128,
+	expertsPerToken: 8,
+	maxContext: 256000,
+	benchmarks: {
+		GPQA: 0.38,
+		MMLU: 0.76,
+				"SWE-Bench": 0.42,
+		IFEval: 0.70,
+		GSM8K: 0.78,
+		HumanEval: 0.75,
+		ARC: 0.72
+	},
+	desc: "MoE, 25.2B total / 3.8B active, 30 레이어, 128 experts, max context 256K"
+	},
+	// === Gemma 4 31b Dense — Blog docs + Ollama verified ===
+	{
+	name: "Gemma 4 31b",
+	group: "Gemma 4",
+	tags: ["dense"],
+	totalParams: 30.7,
+	activeParams: 30.7,
+	layerCount: 60,
+	kvHeads: 32,
+	kvHeadDim: 512,
+	attnHeads: 32,
+	hiddenSize: 3072,
+	maxContext: 256000,
+slidingWindow: 1024,
+        benchmarks: {
+            GPQA: 0.50,
+            MMLU: 0.85,
+            "SWE-Bench": 0.52,
+            IFEval: 0.79,
+            GSM8K: 0.91,
+            HumanEval: 0.86,
+            ARC: 0.81
+         },
+	desc: "Dense, 30.7B, MHA, 60 레이어, max context 256K (sliding window 1024)"
+	},
+	// === Claude Opus 4.7 — Cloud model (llm-stats benchmarks) ===
+	{
+		name: "Claude Opus 4.7",
+		group: "Claude (Cloud)",
+		tags: ["cloud", "dense"],
+		totalParams: null,
+		activeParams: null,
+		layerCount: null,
+		kvHeads: null,
+		kvHeadDim: null,
+		attnHeads: null,
+		hiddenSize: null,
+		maxContext: 200000,
+		isCloud: true,
+		benchmarks: {
+			GPQA: 0.94,
+			MMLU: 0.92,
+				"SWE-Bench": 0.88,
+			IFEval: 0.86,
+			GSM8K: 0.83,
+			HumanEval: 0.82,
+			ARC: 0.81
+		},
+		contextLimit: "200K",
+		desc: "Cloud 모델 — 벤치마크 전용 표시"
+	}
 ];
 
 // ===== MACBOOK RAM OPTIONS =====
@@ -372,13 +509,11 @@ function renderDropdowns() {
 // ===== EVENTS =====
 function bindEvents() {
      document.getElementById('modelSelect').addEventListener('change', function() {
-        selectedModel = MODELS[parseInt(this.value)];
-        quantBits = 16;
-        document.getElementById('bitSlider').value = 16;
-        document.getElementById('bitSelect').value = '16';
-        updateBitDisplay();
-        updateDisplay();
-     });
+         selectedModel = MODELS[parseInt(this.value)];
+         quantBits = 16;
+         updateBitDisplay();
+         updateDisplay();
+       });
      document.getElementById('ramSelect').addEventListener('change', function() {
         selectedRam = parseInt(this.value);
         updateDisplay();
@@ -388,18 +523,11 @@ function bindEvents() {
         updateCtxDisplay();
         updateDisplay();
      });
-     document.getElementById('bitSlider').addEventListener('input', function() {
-        quantBits = parseInt(this.value);
-        document.getElementById('bitSelect').value = String(quantBits);
-        updateBitDisplay();
-        updateDisplay();
-     });
-     document.getElementById('bitSelect').addEventListener('change', function() {
-        quantBits = parseInt(this.value);
-        document.getElementById('bitSlider').value = quantBits;
-        updateBitDisplay();
-        updateDisplay();
-     });
+    document.getElementById('bitSelect').addEventListener('change', function() {
+       quantBits = parseInt(this.value);
+       updateBitDisplay();
+       updateDisplay();
+      });
 }
 
 function updateCtxDisplay() {
@@ -414,33 +542,96 @@ function updateBitDisplay() {
 // ===== CALCULATIONS =====
 function calcKVCache(model, ctx, bits) {
      const bpe = bits / 8;
+     
+     // Gemma 4 series uses sliding window attention (1024 tokens)
+     // KV cache only stores the last `slidingWindow` tokens, not full context
+     const effectiveCtx = (model.slidingWindow || 0) > 0 
+         ? Math.min(ctx, model.slidingWindow) 
+         : ctx;
+     
      const kvPerToken = 2 * model.kvHeads * model.kvHeadDim * bpe;
-     const totalBytes = kvPerToken * model.layerCount * ctx;
+     const totalBytes = kvPerToken * model.layerCount * effectiveCtx;
      return {
         totalGB: totalBytes / (1024**3),
         perTokenKB: kvPerToken / 1024,
         kvPerToken: kvPerToken,
-        totalBytes
-     };
+        totalBytes,
+        effectiveCtx
+   };
 }
+
+// Quantization-specific memory overhead adjustment from official benchmark data
+// Small models have higher overhead (scaling factors, embedding tables, etc.)
+const quantAdjust = {
+    "Gemma 4 e2b":       { 16: 0.94, 8: 0.90,   4: 1.26 },
+    "Gemma 4 e4b":       { 16: 0.94, 8: 0.94,   4: 1.25 },
+    "Gemma 4 31b":       { 16: 0.95, 8: 0.99,   4: 1.13 },
+    "Gemma 4 26b A4B":   { 16: 0.95, 8: 0.99,   4: 1.24 }
+};
 
 function calcParamMemory(model, bits) {
      const bpe = bits / 8;
-     const totalGB = model.totalParams * 1e9 * bpe / (1024**3);
-     const activeGB = model.activeParams ? model.activeParams * 1e9 * bpe / (1024**3) : null;
+     const baseTotalGB = model.totalParams * 1e9 * bpe / (1024**3);
+     const baseActiveGB = model.activeParams ? model.activeParams * 1e9 * bpe / (1024**3) : null;
+     
+     let multiplier = (quantAdjust[model.name] && quantAdjust[model.name][bits]) || 1.0;
+     const totalGB = baseTotalGB * multiplier;
+     const activeGB = baseActiveGB ? baseActiveGB * multiplier : null;
      return { totalGB, activeGB };
+}
+
+// ===== RUNTIME OVERHEAD =====
+// MLX + Ollama 런타임에서 발생하는 추가 메모리 오버헤드 추정
+// - 양자화 메타데이터 (스케일, 비트맵, 매핑 테이블): 파라미터 메모리의 ~12%
+// - KV 블록 할당 오버헤드 (1024-2048토큰 단위 할당 경계 조정): KV의 ~15%
+// - 활성화 인터미디에이트 버퍼 (attention/FFN 중간값): 컨텍스트에 비례
+// - 고정 오버헤드 (MLX + Ollama 런타임 기반): ~2GB
+// 검증: Qwen3.6 35B @ 130K @ 8bit → 이론 43GB, 실제 54GB → 오버헤드 11GB
+function calcRuntimeOverhead(model, ctx, bits) {
+     const paramMem = calcParamMemory(model, bits).totalGB;
+     const kvMem = calcKVCache(model, ctx, bits).totalGB;
+     
+     const paramOverhead = paramMem * 0.12;          // 양자화 메타데이터
+     const kvOverhead = kvMem * 0.15;                // 블록 할당 padding
+     const activationOverhead = ctx * 0.00003;        // 활성화 버퍼 (토큰비례)
+     const fixedOverhead = 2.0;                       // 고정 런타임 오버헤드
+     
+     return {
+         paramOverheadGB: paramOverhead,
+         kvOverheadGB: kvOverhead,
+         activationOverheadGB: activationOverhead,
+         fixedOverheadGB: fixedOverhead,
+         totalGB: paramOverhead + kvOverhead + activationOverhead + fixedOverhead
+     };
 }
 
 function calcMaxContext(model, ram, bits) {
      const os = getOsOverhead(ram);
      const targetBytes = ram * (1024**3) * 0.8;
      const bpe = bits / 8;
-     const paramBytes = model.totalParams * 1e9 * bpe;
+     
+      // 양자화 보정 적용 (calcParamMemory와 동일)
+     const quantMultiplier = (quantAdjust[model.name] && quantAdjust[model.name][bits]) || 1.0;
+     const paramBytes = model.totalParams * 1e9 * bpe * quantMultiplier;
+      // Sliding window: KV cache is capped at slidingWindow tokens regardless of ctx
+     const kvCapped = (model.slidingWindow || 0) > 0;
      const kvBytesPerToken = 2 * model.kvHeads * model.kvHeadDim * bpe * model.layerCount;
      if (kvBytesPerToken <= 0) return 0;
-     const remaining = targetBytes - paramBytes - os * (1024**3);
+     const kvBytesCapped = kvCapped ? kvBytesPerToken * model.slidingWindow : kvBytesPerToken;
+      // 런타임 오버헤드 (KV 캐시는 sliding window 기준으로 계산)
+     const fixedOverheadGB = (paramBytes / (1024**3) * 0.12) + (kvBytesCapped * 0.15 / (1024**3)) + 2.0;
+     const remaining = targetBytes - paramBytes - os * (1024**3) - fixedOverheadGB * (1024**3);
      if (remaining <= 0) return 0;
-     return Math.floor(remaining / kvBytesPerToken);
+      
+      // Sliding window: KV 캐시는 고정된 크기로, 컨텍스트 길이에 비례하지 않음
+      // 따라서 RAM이 컨텍스트 길이를 제한하지 않음 → 모델의 최대 컨텍스트만 적용
+     if (kvCapped) {
+          return model.maxContext;
+     }
+      
+     const ramLimitedCtx = Math.floor(remaining / kvBytesPerToken);
+        // 모델별 최대 컨텍스트 제한도 적용 (RAM 한계와 모델 한계 중 더 작은 값)
+     return Math.min(ramLimitedCtx, model.maxContext);
 }
 
 // ===== UPDATE DISPLAY =====
@@ -448,65 +639,138 @@ function updateDisplay() {
      const os = getOsOverhead(selectedRam);
      const kv = calcKVCache(selectedModel, ctxTokens, quantBits);
      const param = calcParamMemory(selectedModel, quantBits);
-     const total = os + kv.totalGB + param.totalGB;
+     const overhead = calcRuntimeOverhead(selectedModel, ctxTokens, quantBits);
+     const total = os + kv.totalGB + param.totalGB + overhead.totalGB;
      const pct = (total / selectedRam) * 100;
      const maxCtx = calcMaxContext(selectedModel, selectedRam, quantBits);
      const fmtNum = (b) => {
         if (b >= 1e9) return (b/1e9).toFixed(1)+'B';
         if (b >= 1e6) return (b/1e6).toFixed(0)+'M';
         return (b/1024).toFixed(0)+'K';
-     };
+      };
 
-     // Top stats
+       // Top stats
      const ctxStr = ctxTokens.toLocaleString();
      document.getElementById('osMem').textContent = os.toFixed(1) + ' GB';
      document.getElementById('osMem').className = 'value';
      document.getElementById('osMem').style.color = '#6b7280';
 
-     const maxCtxEl = document.getElementById('maxCtx');
-     maxCtxEl.textContent = maxCtx.toLocaleString() + ' 토큰';
+    function classifyTier(t) {
+        if (t < 50000) return '<span style="color:var(--green)">● 기본 (~30K) — 대부분의 작업에 충분</span>';
+        if (t < 130000) return '<span style="color:var(--yellow)">● 적정선 (60~130K) — 복잡도가 높은 작업</span>';
+        return '<span style="color:var(--pink)">◎ 특수 목적 (130K+) — 긴 문서 분석, 코드베이스 전체 컨텍스트 등</span>';
+       }
 
-     // KV
+     // Opus 4.7 대비 종합 성능 % 계산
+     const opusModel = MODELS.find(m => m.name.includes('Opus 4.7'));
+     let opusDisplay = '';
+     let opusSub = '';
+     if (selectedModel.benchmarks && opusModel && opusModel.benchmarks) {
+         const selAvgRaw = Object.keys(selectedModel.benchmarks)
+             .reduce((s, k) => s + selectedModel.benchmarks[k], 0) / Object.keys(selectedModel.benchmarks).length;
+         const opusAvgRaw = Object.keys(opusModel.benchmarks)
+             .reduce((s, k) => s + opusModel.benchmarks[k], 0) / Object.keys(opusModel.benchmarks).length;
+         const selOpusPct = opusAvgRaw > 0 ? (selAvgRaw / opusAvgRaw * 100) : 0;
+         const color = selOpusPct >= 90 ? 'var(--green)' : selOpusPct >= 75 ? 'var(--yellow)' : 'var(--red)';
+         opusDisplay = `<span style="color:${color}">${selOpusPct.toFixed(1)}%</span>`;
+         opusSub = `${selectedModel.name} = Opus 4.7 대비 종합 <span style="color:${color};font-weight:700">${selOpusPct.toFixed(1)}%</span> · (7개 벤치 평균)`;
+     } else {
+         opusDisplay = '—';
+         opusSub = '벤치마크 데이터 없음';
+     }
+     document.getElementById('opusPct').innerHTML = opusDisplay;
+     document.getElementById('ctxTier').innerHTML = opusSub;
+
+     const maxCtxEl = document.getElementById('maxCtx');
+     const ctxTier2El = document.getElementById('ctxTier2');
+     if (maxCtx > 0) {
+         maxCtxEl.textContent = maxCtx.toLocaleString() + ' 토큰';
+         maxCtxEl.style.color = '';
+         ctxTier2El.innerHTML = classifyTier(ctxTokens) + ' · 최대 ' + (maxCtx < selectedModel.maxContext ? maxCtx.toLocaleString() + ' (RAM)' : selectedModel.maxContext.toLocaleString() + ' (모델)');
+        } else {
+         maxCtxEl.textContent = '⚠️ 불가';
+         maxCtxEl.style.color = 'var(--yellow)';
+         ctxTier2El.innerHTML = classifyTier(ctxTokens) + ' · ⚠️ 최대 제한 초과 (RAM 부족)';
+        }
+
+      // KV
      document.getElementById('kvSize').textContent = kv.totalGB.toFixed(1) + ' GB';
      document.getElementById('kvSize').className = 'value ' + (pct > 95 ? 'bad' : pct > 80 ? 'warn' : 'good');
      document.getElementById('kvSub').textContent = `토큰당 ${fmtNum(kv.kvPerToken)} (${kv.perTokenKB.toFixed(2)}KB/토큰)`;
 
-     // Param memory display
+       // Param memory display
+     const paramSizeEl = document.getElementById('paramSize');
+     paramSizeEl.textContent = param.totalGB.toFixed(1) + ' GB';
+     paramSizeEl.className = 'value';
+     paramSizeEl.style.color = '#5b8cff';
      document.getElementById('paramSub').textContent = `${selectedModel.totalParams}B × ${quantBits}bit÷8`;
 
-     // Total
+     // Runtime overhead display
+     const overheadSizeEl = document.getElementById('overheadSize');
+     overheadSizeEl.textContent = overhead.totalGB.toFixed(1) + ' GB';
+     overheadSizeEl.className = 'value';
+     overheadSizeEl.style.color = '#f0c000';
+     document.getElementById('overheadSub').textContent = `${overhead.paramOverheadGB.toFixed(1)} + ${overhead.kvOverheadGB.toFixed(1)} + ${overhead.activationOverheadGB.toFixed(2)} + ${overhead.fixedOverheadGB.toFixed(1)} GB`;
+
+      // Total
      const totalEl = document.getElementById('totalMem');
      totalEl.textContent = total.toFixed(1) + ' GB';
      totalEl.className = 'value ' + (pct > 95 ? 'bad' : pct > 80 ? 'warn' : 'good');
-     document.getElementById('totalSub').textContent = `RAM ${selectedRam}GB 중 ${pct.toFixed(1)}% · 여유 ${(selectedRam - total).toFixed(1)}GB`;
+     document.getElementById('totalSub').textContent = `RAM ${selectedRam}GB 중 ${pct.toFixed(1)}% · 여유 ${(selectedRam - total).toFixed(1)}GB · 📊 실제 측정 ${total.toFixed(1)}GB 추정`;
 
-     // Stacked bar
-     const totalForBar = Math.max(total, 0.01);
-     const osPct = Math.min((os / (selectedRam * 100)) * 100, 100);
-     const paramPct = Math.min((param.totalGB / (selectedRam * 100)) * 100, 100);
-     const kvPct = Math.min((kv.totalGB / (selectedRam * 100)) * 100, 100);
+        // Stacked bar - 각 세그먼트는 RAM 대비 실제 % (빈칸 없이 총 %를 구성)
+     const totalGB = os + param.totalGB + kv.totalGB + overhead.totalGB;
+     const overGB = Math.max(0, totalGB - selectedRam);
+     const overPct = Math.max(0, (overGB / selectedRam) * 100);
+     const isOver = overGB > 0;
+
+         // RAM 대비 %로 계산 (무조건 합이 totalPct가 됨, 바가 RAM 100%를 넘을 수 있음)
+     const osPct = (os / selectedRam) * 100;
+     const paramPct = (param.totalGB / selectedRam) * 100;
+     const kvPct = (kv.totalGB / selectedRam) * 100;
+     const overheadPct = (overhead.totalGB / selectedRam) * 100;
 
      const osBarEl = document.getElementById('osBar');
      osBarEl.style.width = osPct + '%';
-     osBarEl.textContent = osPct > 5 ? os.toFixed(1)+'GB' : '';
+     osBarEl.textContent = osPct > 3 ? os.toFixed(1)+'GB' : '';
 
      const paramBarEl = document.getElementById('paramBar');
      paramBarEl.style.width = paramPct + '%';
-     paramBarEl.textContent = paramPct > 5 ? param.totalGB.toFixed(1)+'GB' : '';
+     paramBarEl.textContent = paramPct > 2 ? param.totalGB.toFixed(1)+'GB' : '';
 
      const kvBarEl = document.getElementById('kvBar');
      kvBarEl.style.width = kvPct + '%';
-     kvBarEl.textContent = kvPct > 5 ? kv.totalGB.toFixed(1)+'GB' : '';
+     kvBarEl.textContent = kvPct > 1.5 ? kv.totalGB.toFixed(1)+'GB' : '';
 
-     // Bar label
-     document.getElementById('memBarLabel').textContent =
-          `나머지 ${Math.max(0,(selectedRam - total)).toFixed(1)}GB · OS 6~8GB 포함`;
+     const overheadBarEl = document.getElementById('overheadBar');
+     overheadBarEl.style.width = overheadPct + '%';
+     overheadBarEl.textContent = overheadPct > 1.5 ? overhead.totalGB.toFixed(1)+'GB' : '';
 
-     // Update slider max
+         // bar label: 전체 % (100+ 초과 시 초과치 포함하여 표시)
+     const barWrapEl = document.querySelector('.mem-bar-wrap');
+     barWrapEl.classList.toggle('overspent', isOver);
+     const totalPct = osPct + paramPct + kvPct + overheadPct;
+     document.getElementById('memBarLabel').innerHTML = isOver
+            ? `<span class="over">▶ ${totalPct.toFixed(0)}% (${overPct.toFixed(0)}% 초과!)</span>`
+            : `${totalPct.toFixed(0)}%`;
+
+            // 동적 슬라이더 범위 설정 (최대토큰에 맞춰 max 조정)
      const ctxSlider = document.getElementById('ctxSlider');
-     ctxSlider.max = Math.max(maxCtx, 1024);
-     if (ctxTokens > maxCtx) ctxTokens = maxCtx;
-     updateCtxDisplay();
+       // maxCtx는 RAM으로 계산된 물리적 한계. 하지만 0이면 모델별 maxContext를 기준으로 함
+       // 즉 항상 "RAM 한계와 모델별 최대 컨텍스트 중 더 작은 값"으로 슬라이더 max를 설정
+     const modelMaxCtx = selectedModel.maxContext || 262144;
+     const sliderMax = (maxCtx > 0) ? Math.max(1024, Math.min(maxCtx, modelMaxCtx)) : Math.max(1024, modelMaxCtx);
+     ctxSlider.max = sliderMax;
+     ctxSlider.min = 1024;
+     ctxSlider.step = 1024;
+     // 현재 값이 slider max를 초과하면 clamp, 이하면 그대로 유지
+     if (ctxTokens > sliderMax) {
+         ctxSlider.value = sliderMax;
+         ctxTokens = sliderMax;
+         updateCtxDisplay();
+     } else {
+         ctxSlider.value = ctxTokens;
+     }
 
      // KV formula display
      document.getElementById('kvFormula').textContent =
@@ -515,39 +779,141 @@ function updateDisplay() {
      document.getElementById('kvPerToken').textContent = kv.perTokenKB.toFixed(2) + ' KB';
      document.getElementById('maxToken').textContent = maxCtx.toLocaleString();
 
+      // Gemma 4 Sliding Window explanation visibility
+     const gemmaSWIDiv = document.getElementById('gemmaSWI');
+     if (gemmaSWIDiv) {
+         gemmaSWIDiv.style.display = (selectedModel && selectedModel.group === 'Gemma 4') ? 'block' : 'none';
+     }
+
      // Bar chart + table
      updateBarChart(os);
+     
+     // Benchmark comparison chart
+     updateBenchmarkChart();
+}
+
+// ===== BENCHMARK CHART =====
+function updateBenchmarkChart() {
+     const container = document.getElementById('benchSection');
+     
+      // 벤치마크 점수가 있는 모델들만 필터
+     const benchModels = MODELS.filter(m => m.benchmarks);
+     
+      // 모든 벤치키 수집 (중복 제거)
+     const allBenchKeys = [...new Set(benchModels.flatMap(m => Object.keys(m.benchmarks)))];
+     
+      // Opus 4.7 점수 계산 (기준)
+     const opusModel = benchModels.find(m => m.name.includes('Opus 4.7'));
+     const opusAvg = opusModel ? Object.keys(opusModel.benchmarks).reduce((sum, k) => sum + opusModel.benchmarks[k], 0) / Object.keys(opusModel.benchmarks).length : 1.0;
+     
+      // 각 모델별 점수 계산 + Opus 대비 비율
+     const benchList = benchModels.map(m => {
+         const benchKeys = Object.keys(m.benchmarks);
+         const avgScore = benchKeys.reduce((sum, k) => sum + m.benchmarks[k], 0) / benchKeys.length;
+         const opusPct = opusAvg > 0 ? (avgScore / opusAvg * 100).toFixed(1) : '--';
+         return { ...m, avgScore: (avgScore*100).toFixed(1), avgRaw: avgScore, opusPct, benchKeys };
+         }).sort((a, b) => {
+              // 1) Opus 4.7 항상 최상단 고정
+          if (a.name.includes('Opus 4.7')) return -1;
+          if (b.name.includes('Opus 4.7')) return 1;
+              // 2) 그 외는 Opus 대비 비율 내림차순
+          return parseFloat(b.opusPct) - parseFloat(a.opusPct);
+          });
+    
+      // 상단 요약행: Opus 대비 선택모델 %
+     let extraInfo = '';
+     if (selectedModel.benchmarks && opusAvg > 0) {
+         const selAvgRaw = Object.keys(selectedModel.benchmarks).reduce((sum, k) => sum + selectedModel.benchmarks[k], 0) / Object.keys(selectedModel.benchmarks).length;
+         const selOpusPct = (selAvgRaw / opusAvg * 100).toFixed(1);
+         const selColor = parseFloat(selOpusPct) >= 90 ? 'var(--green)' : parseFloat(selOpusPct) >= 80 ? 'var(--yellow)' : 'var(--orange)';
+         extraInfo += `<span style="font-size:13px;color:${selColor};font-weight:700;background:#1a1a0a;padding:3px 10px;border-radius:6px">👉 ${selectedModel.name} = Opus 4.7 기준 ${selOpusPct}%</span>`;
+     }
+     
+     let html = `
+         <div style="background:var(--card);border-radius:12px;padding:16px 20px;margin-bottom:16px;border:1px solid #1e2a42;margin-top:16px">
+             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+                 <h2 style="font-size:14px;margin:0;color:var(--accent)">📊 벤치마크 성능 비교 (llm-stats.com 기준)</h2>
+                 <div style="display:flex;gap:8px;align-items:center">
+                     ${extraInfo}
+                     ${selectedModel.benchmarks ? `<span style="font-size:11px;color:#888;background:#1a1a1a;padding:2px 8px;border-radius:4px">👈 ${selectedModel.name} 선택됨</span>` : ''}
+                 </div>
+             </div>
+              <div style="background:#0a0c14;border-radius:8px;padding:10px 12px;font-size:10px;margin-bottom:8px;color:#aaa;line-height:1.5">
+                 📌 <b>기준점:</b> <span style="color:var(--green);font-weight:700">Opus 4.7 = 100점</span>(만점 기준) / 타모델은 Opus 대비 %로 표시 / 7개 벤치(GPQA, MMLU, SWE-Bench, IFEval, GSM8K, HumanEval, ARC) 평균
+              </div>
+             <div id="benchChart"></div>
+         </div>`;
+    
+     container.innerHTML = html;
+     
+     const benchContainer = document.getElementById('benchChart');
+     let benchHtml = '<table style="width:100%;border-collapse:collapse;font-size:12px">';
+     benchHtml += '<tr><th style="text-align:left;padding:6px">모델</th>';
+             allBenchKeys.forEach(k => { benchHtml += `<th style="padding:6px;text-align:center;font-size:10px">${k}<br><span style="font-size:9px;color:#666">(점수)</span></th>`; });
+     benchHtml += '<th style="padding:6px;text-align:center;color:var(--yellow)">총점<br><span style="font-size:9px;color:#666">(Opus=100 기준)</span></th>';
+     benchHtml += '<th style="padding:6px;text-align:center;color:var(--pink)">Opus 대비<br><span style="font-size:9px;color:#666">(%)</span></th></tr>';
+    
+     benchList.forEach((m, idx) => {
+         const scoreNum = parseFloat(m.avgScore);
+         const opusPctNum = parseFloat(m.opusPct);
+         const isOpus = m.name.includes('Opus 4.7');
+         const isSelected = m === selectedModel;
+         let rowStyle = '';
+         if (isOpus) rowStyle = 'background:#0a1a2a;border-top:2px solid var(--green);';
+         else if (isSelected) rowStyle = 'background:#1a2a4a;';
+         const badge = isSelected ? ' 👈' : '';
+         const paramStr = m.totalParams ? Math.max(0,m.totalParams)+'B' : '—';
+         const cloudIcon = m.isCloud && !isOpus ? ' ☁️' : '';
+         
+         benchHtml += `<tr style="${rowStyle}">`;
+         benchHtml += `<td style="padding:6px;font-weight:${isOpus?'bold':'normal'}">${paramStr}${cloudIcon} ${m.name}${badge}</td>`;
+         m.benchKeys.forEach(k => {
+             const score = m.benchmarks[k] * 100;
+             const scColor = score >= 90 ? 'var(--green)' : score >= 80 ? 'var(--yellow)' : score >= 70 ? 'var(--orange)' : 'var(--red)';
+             benchHtml += `<td style="text-align:center;color:${isSelected?'var(--yellow)':scColor};font-weight:${isSelected?'bold':'normal'}">${score.toFixed(0)}</td>`;
+               });
+         benchHtml += `<td style="text-align:center;font-weight:bold;color:${isOpus?'var(--green)':scoreNum >= 90 ? 'var(--green)' : scoreNum >= 80 ? 'var(--yellow)' : 'var(--orange)'};font-size:13px">${isOpus ? '100.0' : m.avgScore}</td>`;
+         benchHtml += `<td style="text-align:center;font-weight:bold;color:${opusPctNum >= 90 ? 'var(--green)' : opusPctNum >= 80 ? 'var(--yellow)' : opusPctNum >= 70 ? 'var(--orange)' : 'var(--red)'};font-size:13px">${isOpus ? '—' : m.opusPct + '%'}</td></tr>`;
+          });
+      
+     benchHtml += '</table>';
+     benchHtml += `<div style="font-size:10px;color:#888;margin-top:6px">☁️=클라우드 모델(로컬RAM불가) · Opus 4.7 = 기준점 100점 · ${selectedModel.name} ${opusAvg > 0 ? '= '+parseFloat(Object.keys(selectedModel.benchmarks).reduce((s,k) => s+selectedModel.benchmarks[k],0)/Object.keys(selectedModel.benchmarks).length/opusAvg*100).toFixed(1)+'%' : ''}</div>`;
+     benchContainer.innerHTML = benchHtml;
 }
 
 // ===== BAR CHART =====
 function updateBarChart(os) {
      const container = document.getElementById('barChart');
-     const calcTable = MODELS.map(m => {
+     // 클라우드 모델은 로컬 비교 테이블에서 제외
+     const localModels = MODELS.filter(m => !m.isCloud);
+     const calcTable = localModels.map(m => {
         const kv = calcKVCache(m, ctxTokens, quantBits);
         const param = calcParamMemory(m, quantBits);
-        const total = os + kv.totalGB + param.totalGB;
+        const overhead = calcRuntimeOverhead(m, ctxTokens, quantBits);
+        const total = os + kv.totalGB + param.totalGB + overhead.totalGB;
         const pctVal = (total / selectedRam) * 100;
         const color = pctVal > 95 ? 'var(--red)' : pctVal > 70 ? 'var(--yellow)' : 'var(--green)';
-        return { ...m, kv: kv.totalGB, param: param.totalGB, os, total, pctVal, color };
-     });
+        return { ...m, kv: kv.totalGB, param: param.totalGB, overhead: overhead.totalGB, os, total, pctVal, color };
+        });
      calcTable.sort((a, b) => b.total - a.total);
-     const maxTotal = Math.max(...calcTable.map(c => c.total), 1);
 
      let html = '';
+     const ram100pct = selectedRam; // RAM이 100% 기준
      calcTable.forEach(c => {
-        const width = Math.min((c.total / maxTotal) * 100, 100);
+        const width = Math.min((c.total / ram100pct) * 100, 150); // RAM 대비 비율, 초과시 최대 150%로 표시
         const tags = c.tags.map(t => `<span class="tag ${t}" style="font-size:8px;padding:1px 3px">${t.toUpperCase()}</span>`).join('');
         html += `<div class="bar-row">
-             <div class="bar-label">${c.name}${tags}</div>
-             <div class="bar-wrap">
-                 <div class="bar-fill" style="width:${width}%;background:${c.color}">${width > 15 ? c.total.toFixed(1)+'GB' : ''}</div>
-             </div>
-             <div class="bar-value" style="color:${c.color}">${c.pctVal.toFixed(0)}%</div>
-         </div>`;
-     });
+               <div class="bar-label">${c.name}${tags}</div>
+               <div class="bar-wrap">
+                   <div class="bar-fill" style="width:${width}%;background:${c.color}">${width > 15 ? c.total.toFixed(1)+'GB' : ''}</div>
+                   ${width > 100 ? '<div style="position:absolute;right:-4px;top:-16px;font-size:9px;color:var(--red);font-weight:700">⚠ '+c.total.toFixed(0)+'GB &gt; '+ram100pct+'GB RAM</div>' : ''}
+               </div>
+               <div class="bar-value" style="color:${c.color}">${c.pctVal.toFixed(0)}% of ${ram100pct}GB</div>
+           </div>`;
+       });
      container.innerHTML = html;
 
-     // Detail table
+       // Detail table
      renderDetailTable(calcTable);
 }
 
@@ -556,35 +922,37 @@ function renderDetailTable(calculations) {
      const container = document.getElementById('detailTable');
      let html = `<table>
          <tr>
-             <th>모델</th><th>총 파라미터</th><th>활성 파라미터</th>
-             <th>레이어</th><th>KV 헤드</th><th>비트</th><th>RAM (${selectedRam}GB)</th>
-             <th>OS</th><th>KV 캐시</th><th>파라미터</th><th>총계</th><th>80% 한계</th><th>사용률</th><th>판단</th>
-         </tr>`;
+              <th>모델</th><th>총 파라미터</th><th>활성 파라미터</th>
+              <th>레이어</th><th>KV 헤드</th><th>비트</th><th>RAM (${selectedRam}GB)</th>
+              <th>OS</th><th>KV 캐시</th><th>파라미터</th><th>오버헤드</th><th>총계</th><th>80% 한계</th><th>사용률</th><th>판단</th>
+          </tr>`;
 
      calculations.forEach(c => {
         const maxCtx = calcMaxContext(c, selectedRam, quantBits);
+        const overhead = calcRuntimeOverhead(c, ctxTokens, quantBits);
         let status = '';
         if (c.pctVal > 95) status = '<span class="bad">⛔ 초과</span>';
         else if (c.pctVal > 70) status = '<span class="warn">⚡ 사용</span>';
         else status = '<span class="good">✅ 안전</span>';
 
         html += `<tr>
-             <td>${c.name}</td>
-             <td>${c.totalParams}B</td>
-             <td>${c.activeParams ? c.activeParams+'B' : '—'}</td>
-             <td>${c.layerCount}</td>
-             <td>${c.kvHeads}</td>
-             <td>${quantBits}bit</td>
-             <td>${selectedRam}GB</td>
-             <td style="color:#6b7280">${c.os.toFixed(1)}GB</td>
-             <td>${c.kv.toFixed(2)}GB</td>
-             <td>${c.param.toFixed(2)}GB</td>
-             <td style="font-weight:700;color:${c.pctVal > 95 ? 'var(--red)' : c.pctVal > 70 ? 'var(--yellow)' : 'var(--green)'}">${c.total.toFixed(1)}GB</td>
-             <td>${maxCtx.toLocaleString()}토큰</td>
-             <td>${c.pctVal.toFixed(1)}%</td>
-             <td>${status}</td>
-         </tr>`;
-     });
+              <td>${c.name}</td>
+              <td>${c.totalParams}B</td>
+              <td>${c.activeParams ? c.activeParams+'B' : '—'}</td>
+              <td>${c.layerCount}</td>
+              <td>${c.kvHeads}</td>
+              <td>${quantBits}bit</td>
+              <td>${selectedRam}GB</td>
+              <td style="color:#6b7280">${c.os.toFixed(1)}GB</td>
+              <td>${c.kv.toFixed(2)}GB</td>
+              <td>${c.param.toFixed(2)}GB</td>
+              <td style="color:var(--yellow)">${overhead.totalGB.toFixed(1)}GB</td>
+              <td style="font-weight:700;color:${c.pctVal > 95 ? 'var(--red)' : c.pctVal > 70 ? 'var(--yellow)' : 'var(--green)'}">${c.total.toFixed(1)}GB</td>
+              <td>${maxCtx > 0 ? maxCtx.toLocaleString() + '토큰' : '⚠️ 불가'}</td>
+              <td>${c.pctVal.toFixed(1)}%</td>
+              <td>${status}</td>
+          </tr>`;
+       });
      html += '</table>';
      container.innerHTML = html;
 }

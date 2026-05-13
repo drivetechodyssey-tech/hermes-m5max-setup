@@ -301,6 +301,10 @@ compression:
   target_ratio: 0.15
   protect_last_n: 10
 
+privacy:
+  redact_pii: true
+  redact_secrets: true
+
 toolsets:
    - hermes-cli
 

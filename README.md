@@ -301,6 +301,103 @@ skills:
 
 ---
 
+## 보조 모델(auxiliary) 설정
+
+Hermes는 12개 부수 작업(제목 생성, 승인 판단, 압축, 비전, curator 등)에 각각
+다른 모델을 지정할 수 있습니다. `provider: auto`는 코드상
+**"메인 프로바이더 + 메인 모델"**을 뜻합니다 (`agent/auxiliary_client.py:3063`).
+
+### 로컬은 클라우드와 계산이 다르다
+
+클라우드라면 "가벼운 일엔 싼 모델"이 항상 옳지만, 로컬에서는 모델 스왑 비용을
+따져야 합니다. **다만 oMLX는 메모리 상한(56GB) 안에서 여러 모델을 동시 상주시킵니다.**
+
+```bash
+curl -s http://127.0.0.1:8000/v1/models/status | python3 -m json.tool | head -5
+```
+
+실측: DWQ 20.2GB + gemma-12B 8.8GB + Llama-3B 1.8GB = **3개 동시 상주, 30.7GB**.
+첫 호출만 로드 비용(0.19초/GB)을 내고 이후는 전부 `load 0.00s`입니다.
+**스왑 스래싱은 일어나지 않으므로 작업별 모델 분리는 안전합니다.**
+
+### 진짜 문제는 모델 크기가 아니라 thinking
+
+메인 모델은 reasoning 모델이라 짧은 작업에서 추론에 예산을 다 씁니다.
+"제목을 5단어로" 같은 요청에 **1,500토큰 15초를 쓰고도 답을 못 냅니다**(`finish=length`).
+
+| 설정 | 결과 |
+|------|------|
+| DWQ, thinking ON, max_tokens=1500 | 15.24s, 1500tok, **답 없음** |
+| DWQ, thinking OFF | **0.53s, 8tok, "유튜브 편집 추임새 자동 제거"** |
+
+`auxiliary.<task>.extra_body`가 이걸 제어하는 통로입니다
+(`_get_task_extra_body()`가 그대로 전달).
+
+```yaml
+auxiliary:
+  title_generation:
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false
+```
+
+### 작업별 배치 원칙
+
+| 부류 | 작업 | 설정 | 이유 |
+|------|------|------|------|
+| **비전** | `vision` | VLM 모델 **명시 필수** | 메인이 텍스트 전용이면 반드시 분리 |
+| **포맷팅** | `title_generation`, `profile_describer` | 메인 + **thinking OFF** | 판단이 필요 없음. 15초 → 0.5초 |
+| **판단** | `approval`, `curator`, `triage_specifier`, `kanban_decomposer` | 메인 + **thinking 유지** | 추론을 끄면 오판한다 |
+| **요약** | `compression` | `gemma-4-12B-it-OptiQ-4bit` | 빠르고 한국어 깔끔 |
+
+### 모델별 한국어 품질 (실측)
+
+| 모델 | 한국어 출력 | 위험판단 |
+|------|-----------|---------|
+| DWQ 20GB (thinking OFF) | ✅ 깔끔 | ⚠️ `rm -rf ~/Projects`를 SAFE로 오판 |
+| gemma-4-12B 8.8GB | ✅ 깔끔 | 실행마다 흔들림 |
+| Llama-3.2-3B 1.8GB | ❌ 외국어 혼입 (`tự động`, `用的`, `उपय`) | 3/3 정답 |
+
+> **Llama-3.2-3B는 한국어 출력 작업에 쓰지 마세요.** 매 실행 베트남어·중국어·데바나가리
+> 문자가 섞여 들어옵니다. 속도는 4배 빠르지만(0.11s) 결과물이 못 씁니다.
+>
+> **위험 판단은 어느 모델도 신뢰할 수 없습니다.** thinking을 끄면 특히 나빠지므로
+> `approval`은 추론을 유지하고, 파괴적 명령은 모델 판단에 맡기지 말고
+> `command_allowlist` / `approvals.destructive_slash_confirm` 같은 규칙으로 막으세요.
+
+### ⚠️ DWQ로 바꾸면 비전이 사라진다
+
+`Qwen3.6-35B-A3B-4bit-DWQ`는 **비전 가중치가 빠진 텍스트 전용 빌드**입니다.
+
+| | 4bit | 4bit-DWQ |
+|---|---|---|
+| oMLX engine | `vlm` | `batched` |
+| `vision_config` | 있음 | **없음** |
+| `preprocessor_config.json` | 있음 | **없음** |
+
+따라서 메인을 DWQ로 쓰려면 **비전은 반드시 VLM으로 따로 지정**해야 합니다.
+
+```yaml
+model:
+  default: Qwen3.6-35B-A3B-4bit-DWQ    # 텍스트 (tool calling 우수)
+auxiliary:
+  vision:
+    provider: omlx
+    model: Qwen3.6-35B-A3B-4bit         # VLM
+```
+
+### 현재 설정 확인
+
+```bash
+python3 -c "
+import yaml,os
+a=yaml.safe_load(open(os.path.expanduser('~/.hermes/config.yaml')))['auxiliary']
+for k,v in a.items():
+    print(f\"{k:<20}{v.get('provider',''):<8}{v.get('model') or '(메인모델)':<30}{v.get('extra_body') or ''}\")"
+```
+
+---
+
 ## oMLX 성능 기능 — 켜지 말 것 (실측 근거)
 
 oMLX 설정에 꺼져 있는 성능 기능들이 있습니다. 이 구성에서는 **둘 다 켜면 안 됩니다.**

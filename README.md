@@ -443,6 +443,57 @@ DEFAULT_THRESHOLD = 8192   # 8K 넘는 프롬프트마다 발동
 - **최적화 대상이 드뭅니다.** Hermes의 프롬프트 캐시 적중률이 93%라
   전체 프리필 자체가 자주 일어나지 않습니다.
 
+## 로그 회전
+
+`config.yaml`의 `logging.max_size_mb` / `backup_count`는 **Python 로거가 쓰는
+`agent.log`·`errors.log`에만** 적용됩니다. `gateway.log`와 `gateway.error.log`는
+launchd가 `StandardOutPath`/`StandardErrorPath`로 직접 리다이렉트하는 파일이라
+그 규칙 밖에 있고 **무한정 자랍니다**(실제로 8.3MB까지 자란 걸 발견).
+
+### mv 로 회전하면 안 되는 이유
+
+게이트웨이 프로세스가 이 파일을 fd로 붙들고 있습니다(`lsof`로 `fd=2u` 확인).
+`mv`로 옮기면 프로세스는 **이동된 inode에 계속 쓰므로** 새로 만든 파일은 영영
+비어 있고 로그는 옮겨진 파일로 들어갑니다.
+
+그래서 **copytruncate**를 씁니다 — 내용을 복사한 뒤 원본을 제자리에서 비웁니다
+(`: > file`). fd가 유지되어 게이트웨이 재시작 없이 회전됩니다.
+
+```bash
+# 검증 결과: inode 유지(1730196), 잘린 뒤 offset 0부터 정상 기록,
+# 희소파일 아님 → launchd가 O_APPEND로 열기 때문
+```
+
+### 구성
+
+| 파일 | 역할 |
+|------|------|
+| `rotate-logs.sh` | 5MB 초과 시 회전, 3세대 gzip 보관 (config 값과 맞춤) |
+| `~/Library/LaunchAgents/ai.hermes.logrotate.plist` | 매일 04:00 실행 (sudo 불필요) |
+
+대상: `gateway.error.log`, `gateway.log`, `desktop.log`, `gui.log`
+
+> macOS 기본 도구인 `newsyslog`는 `/etc/newsyslog.d/`에 써야 해서 sudo가 필요합니다.
+> 사용자 레벨 launchd 에이전트로 하면 권한 없이 됩니다.
+
+### 확인 / 수동 실행
+
+```bash
+# 지금 바로 회전
+~/Projects/hermes-m5max-setup/rotate-logs.sh
+
+# launchd 등록 상태와 마지막 실행 결과
+launchctl print gui/$(id -u)/ai.hermes.logrotate | grep -E "runs =|last exit|state ="
+
+# 강제 실행
+launchctl kickstart -p gui/$(id -u)/ai.hermes.logrotate
+
+# 해제
+launchctl unload ~/Library/LaunchAgents/ai.hermes.logrotate.plist
+```
+
+---
+
 ### 설정 API 함정
 
 `/admin/api/global-settings`의 스키마는 **평면**입니다. 중첩 형태로 보내면

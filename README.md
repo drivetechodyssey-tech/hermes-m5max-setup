@@ -301,6 +301,70 @@ skills:
 
 ---
 
+## oMLX 성능 기능 — 켜지 말 것 (실측 근거)
+
+oMLX 설정에 꺼져 있는 성능 기능들이 있습니다. 이 구성에서는 **둘 다 켜면 안 됩니다.**
+
+### chunked_prefill → OFF 유지
+
+문서상 이득의 조건이 명확합니다.
+
+> "long prefills are interleaved with decode steps. Reduces TTFT **for concurrent requests**
+> at the cost of per-step overhead." (`omlx/settings.py`)
+
+이득은 **동시 요청**에서만 나오는데 `scheduler.max_concurrent_requests: 1`이라 끼워넣을
+다른 요청이 없습니다. 교대 측정(ON/OFF 3쌍, 40K 프리필, 캐시 미적중 확인):
+
+| chunked_prefill | 측정값 | 중앙값 |
+|-----------------|--------|--------|
+| OFF | 25.2, 26.0, 26.3 | **26.0s** |
+| ON | 26.7, 26.7, 27.1 | 26.7s |
+
+ON 3개가 모두 OFF 3개보다 높아 범위가 겹치지 않습니다. 차이는 3%로 작지만 일관적이며,
+문서의 "per-step overhead" 설명과 일치합니다. **이득 0, 페널티 3%.**
+
+### specprefill → OFF 유지
+
+이건 속도 최적화가 아니라 **정확도를 거래하는 손실 기법**입니다.
+
+```
+specprefill_enabled: Enable SpecPrefill (experimental sparse prefill for MoE)
+DEFAULT_KEEP_RATE = 0.20   # 프롬프트 토큰의 80%를 버림
+DEFAULT_THRESHOLD = 8192   # 8K 넘는 프롬프트마다 발동
+```
+
+에이전트 평균 프리필이 6만 토큰이므로 **거의 모든 호출에서 발동**해 대부분을 버립니다.
+툴 출력과 코드를 정확히 읽어야 하는 용도에는 부적합합니다. 게다가:
+
+- **draft 모델이 없습니다.** draft는 타깃과 토크나이저를 공유해야 하는데
+  Qwen3.6 계열에 8B 이하 모델이 존재하지 않습니다(HF 전수 확인). 후보가 35B뿐이라
+  "가벼운 draft로 점수만 매긴다"는 전제가 성립하지 않습니다.
+  (기본 설정된 `specprefill_draft_model`은 다운로드조차 안 된 경로입니다.)
+- **논문 전제가 다릅니다.** [원 논문](https://arxiv.org/abs/2502.02789)의 7.66× TTFT 개선은
+  Llama-3.1-**405B** 기준입니다. Qwen3.6-35B-A3B는 활성 파라미터가 3B인 MoE라
+  타깃 자체가 이미 싸서 경제성이 정반대입니다.
+- **최적화 대상이 드뭅니다.** Hermes의 프롬프트 캐시 적중률이 93%라
+  전체 프리필 자체가 자주 일어나지 않습니다.
+
+### 설정 API 함정
+
+`/admin/api/global-settings`의 스키마는 **평면**입니다. 중첩 형태로 보내면
+`{"success":true,"message":"Settings saved successfully."}`를 반환하면서
+**아무것도 저장하지 않습니다.**
+
+```bash
+# ❌ 조용히 무시됨
+curl -X POST .../admin/api/global-settings -d '{"scheduler":{"chunked_prefill":true}}'
+
+# ✅ 평면 형태
+curl -X POST .../admin/api/global-settings -d '{"chunked_prefill":true}'
+```
+
+응답의 `runtime_applied` 배열에 필드 이름이 들어 있는지로 실제 반영을 확인하세요.
+비어 있으면 적용되지 않은 것입니다.
+
+---
+
 ## 자가 진단
 
 ```bash

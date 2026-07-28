@@ -443,6 +443,57 @@ DEFAULT_THRESHOLD = 8192   # 8K 넘는 프롬프트마다 발동
 - **최적화 대상이 드뭅니다.** Hermes의 프롬프트 캐시 적중률이 93%라
   전체 프리필 자체가 자주 일어나지 않습니다.
 
+## 음성 대화 (TTS / STT)
+
+TUI에서 **Ctrl+B**로 녹음 → 3초 침묵 시 자동 전사 → 에이전트 응답.
+`voice.auto_tts: true`로 두면 응답도 소리 내어 읽는다(코드 블록까지 읽으므로 취향 갈림).
+
+### 현재 구성
+
+| 방향 | 백엔드 | 설정 |
+|------|--------|------|
+| TTS (말하기) | Edge (무료, 키 불필요) | `ko-KR-SunHiNeural` |
+| STT (듣기) | **mlx-whisper** (Metal GPU) | `whisper-large-v3-mlx`, 한국어 고정 |
+
+### STT는 내장 local 대신 mlx-whisper를 쓴다
+
+Hermes 내장 `local` STT는 faster-whisper(CTranslate2) 기반인데, **CTranslate2에는
+Metal 경로가 없어 Apple Silicon에서 CPU(int8)로만 돕니다.** 같은 large-v3 가중치를
+mlx-whisper로 돌리면 전사 결과는 글자까지 동일한데 15배 빠릅니다 (15.1초 한국어 오디오 실측):
+
+| 백엔드 | 전사 시간 | "커밋을" | "위키링크" |
+|--------|----------|---------|-----------|
+| faster-whisper base (CPU) | 0.8s | ❌ 커미들 | ❌ 미키링크 |
+| faster-whisper large-v3 (CPU) | 8.8s | ✅ | ✅ |
+| **mlx-whisper large-v3 (Metal)** | **0.6s 웜 / 1.3s 콜드** | ✅ | ✅ |
+| mlx-whisper large-v3-**turbo** | 0.2s | ❌ 커미들 | ✅ |
+
+turbo는 3배 더 빠르지만 base와 같은 부류의 한국어 오인식("커밋을"→"커미들")이 있어
+탈락. 음성 명령 용도에서는 오인식이 그대로 잘못된 행동으로 이어지므로 정확도 우선.
+
+연결은 Hermes의 **command STT provider**로 한다 (`stt.providers.<이름>: type: command`):
+
+```yaml
+stt:
+  provider: mlx_whisper
+  providers:
+    mlx_whisper:
+      type: command
+      command: /Users/sungjunmaing/Projects/hermes-m5max-setup/mlx-whisper-stt.sh {input_path} {language}
+      language: ko
+      format: txt
+```
+
+래퍼 스크립트는 [`mlx-whisper-stt.sh`](mlx-whisper-stt.sh) — 전사 결과를 stdout으로
+출력하면 Hermes가 transcript로 읽는다. 매 호출이 새 프로세스라 항상 콜드(~2초)지만
+CPU 웜(8.8초)보다 4배 빠르다.
+
+> TTS 음성 후보 비교는 `voice-samples/`의 mp3 3종 참고 — 같은 문장(한국어 + 영어
+> 식별자 + 숫자)으로 생성했다. 영어 기술 용어가 많으면 `ko-KR-HyunsuMultilingualNeural`
+> (다국어)도 고려.
+
+---
+
 ## 로그 회전
 
 `config.yaml`의 `logging.max_size_mb` / `backup_count`는 **Python 로거가 쓰는

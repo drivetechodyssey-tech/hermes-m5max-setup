@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hermes Agent 최적화 리포트 — 2026-07-27</title>
+<style>
+:root {
+  color-scheme: light;
+  --surface-0: #f6f5f2;
+  --surface-1: #fcfcfb;
+  --surface-2: #efeeea;
+  --border:    #dedcd5;
+  --text-1:    #0b0b0b;
+  --text-2:    #52514e;
+  --text-3:    #83817a;
+  --s1: #2a78d6;   /* blue   — 이후/개선 */
+  --s2: #eb6834;   /* orange — 이전/문제 */
+  --s3: #1baf7a;   /* aqua   — 보조 */
+  --good:     #0ca30c;
+  --warning:  #fab219;
+  --critical: #d03b3b;
+  --grid: #e6e4de;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-0: #121211;
+    --surface-1: #1a1a19;
+    --surface-2: #242422;
+    --border:    #34342f;
+    --text-1:    #ffffff;
+    --text-2:    #c3c2b7;
+    --text-3:    #93928a;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --grid: #2e2e2a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211;
+  --surface-1: #1a1a19;
+  --surface-2: #242422;
+  --border:    #34342f;
+  --text-1:    #ffffff;
+  --text-2:    #c3c2b7;
+  --text-3:    #93928a;
+  --s1: #3987e5;
+  --s2: #d95926;
+  --s3: #199e70;
+  --grid: #2e2e2a;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--surface-0);
+  color: var(--text-1);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+               "Noto Sans KR", system-ui, sans-serif;
+  line-height: 1.7;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap { max-width: 940px; margin: 0 auto; padding: 48px 20px 96px; }
+
+header { border-bottom: 2px solid var(--text-1); padding-bottom: 24px; margin-bottom: 8px; }
+h1 { font-size: 30px; line-height: 1.3; margin: 0 0 8px; letter-spacing: -0.02em; }
+.sub { color: var(--text-2); font-size: 15px; margin: 0; }
+.meta { color: var(--text-3); font-size: 13px; margin-top: 12px; font-variant-numeric: tabular-nums; }
+
+h2 {
+  font-size: 21px; margin: 56px 0 6px; letter-spacing: -0.01em;
+  padding-top: 20px; border-top: 1px solid var(--border);
+}
+h2 .num { color: var(--text-3); font-weight: 400; margin-right: 10px; font-variant-numeric: tabular-nums; }
+h3 { font-size: 16px; margin: 32px 0 8px; }
+p { margin: 12px 0; color: var(--text-2); }
+p strong, li strong { color: var(--text-1); }
+ul { color: var(--text-2); padding-left: 22px; }
+li { margin: 6px 0; }
+
+.lede { font-size: 16px; color: var(--text-1); margin: 16px 0 8px; }
+
+/* stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 28px 0; }
+.tile {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 10px; padding: 16px 16px 14px;
+}
+.tile .k { font-size: 12px; color: var(--text-3); margin-bottom: 6px; }
+.tile .v { font-size: 25px; font-weight: 650; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+.tile .d { font-size: 12px; color: var(--text-2); margin-top: 5px; }
+
+/* figure */
+figure { margin: 28px 0; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 20px 18px 14px; }
+figcaption { font-size: 13px; color: var(--text-2); margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.fig-title { font-size: 15px; font-weight: 600; margin-bottom: 2px; }
+.fig-sub { font-size: 12.5px; color: var(--text-3); margin-bottom: 16px; }
+.chart-scroll { overflow-x: auto; }
+svg { display: block; width: 100%; height: auto; max-width: 100%; }
+svg text { font-family: inherit; font-variant-numeric: tabular-nums; }
+
+/* legend */
+.legend { display: flex; gap: 18px; flex-wrap: wrap; margin-bottom: 14px; font-size: 12.5px; color: var(--text-2); }
+.legend span { display: inline-flex; align-items: center; gap: 7px; }
+.swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+/* tables */
+.tbl-scroll { overflow-x: auto; margin: 22px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 480px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { color: var(--text-3); font-weight: 600; font-size: 12px; text-transform: none; white-space: nowrap; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr:hover { background: var(--surface-2); }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.9em;
+       background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+pre { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 16px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+pre code { background: none; padding: 0; }
+
+/* callouts */
+.note { border-left: 3px solid var(--s1); background: var(--surface-1); padding: 14px 18px;
+        margin: 22px 0; border-radius: 0 8px 8px 0; }
+.note.warn { border-left-color: var(--warning); }
+.note.bad  { border-left-color: var(--critical); }
+.note.fix  { border-left-color: var(--good); }
+.note .lbl { font-size: 11.5px; font-weight: 700; letter-spacing: 0.04em; margin-bottom: 5px; display: block; }
+.note.warn .lbl { color: #a97400; }
+.note.bad .lbl  { color: var(--critical); }
+.note.fix .lbl  { color: #0a7d0a; }
+.note:not(.warn):not(.bad):not(.fix) .lbl { color: var(--s1); }
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .note.warn .lbl { color: var(--warning); }
+  :root:where(:not([data-theme="light"])) .note.fix .lbl  { color: var(--good); }
+}
+:root[data-theme="dark"] .note.warn .lbl { color: var(--warning); }
+:root[data-theme="dark"] .note.fix .lbl  { color: var(--good); }
+.note p { margin: 6px 0; }
+.note p:last-child { margin-bottom: 0; }
+
+.tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px;
+       background: var(--surface-2); color: var(--text-2); border: 1px solid var(--border); margin-left: 6px; vertical-align: middle; }
+.tag.ok  { color: #0a7d0a; border-color: #0ca30c55; }
+.tag.no  { color: var(--critical); border-color: #d03b3b55; }
+
+footer { margin-top: 72px; padding-top: 24px; border-top: 1px solid var(--border);
+         color: var(--text-3); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>Hermes Agent 최적화 리포트</h1>
+  <p class="sub">MacBook Pro M5 Max · 64GB · oMLX + Qwen3.6-35B-A3B</p>
+  <p class="meta">2026-07-27 · 측정 기반 · 모든 수치는 실제 실행으로 확인함</p>
+</header>
+
+<p class="lede">
+  이 문서는 감이 아니라 <strong>측정</strong>으로 진행한 기록입니다. 세션 DB(42,340개 메시지),
+  oMLX 서버 실측, 소스 코드 확인을 근거로 삼았고, <strong>틀린 판단을 내렸다가 재측정으로
+  뒤집은 경우도 그대로 적었습니다.</strong> 잘못된 최적화가 어떻게 생기는지가 결과만큼 중요하기 때문입니다.
+</p>
+
+<div class="tiles">
+  <div class="tile"><div class="k">복구한 스킬</div><div class="v">14개</div><div class="d">curator가 삭제한 실사용 스킬</div></div>
+  <div class="tile"><div class="k">고정 프롬프트 절감</div><div class="v">-17.5%</div><div class="d">18,169 → 14,982 토큰</div></div>
+  <div class="tile"><div class="k">에이전트 과제 속도</div><div class="v">1.7배</div><div class="d">모델 교체 효과</div></div>
+  <div class="tile"><div class="k">회수한 디스크</div><div class="v">54.5GB</div><div class="d">중복 모델 + WAL</div></div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">01</span>가장 큰 문제 — curator가 거꾸로 돌고 있었다</h2>
+
+<p>
+  Hermes의 <strong>curator</strong>는 주 1회 돌며 안 쓰는 스킬을 정리하는 백그라운드 작업입니다.
+  그런데 소스(<code>agent/curator.py</code>)를 보니 판정 기준이 <strong><code>last_activity_at</code> 하나뿐</strong>이고
+  <code>use_count</code>는 전혀 참조하지 않습니다.
+</p>
+
+<div class="note bad">
+  <span class="lbl">구조적 결함</span>
+  <p>“30회 썼지만 최근 90일간 안 씀” == “0회 쓰고 방치됨”</p>
+  <p>영상 제작처럼 <strong>프로젝트 단위로 몰아 쓰는 패턴</strong>에서는, 잘 쓰던 스킬일수록
+  프로젝트 사이의 공백 때문에 삭제 대상이 됩니다. 직관과 정반대로 작동합니다.</p>
+</div>
+
+<figure>
+  <div class="fig-title">curator가 삭제한 스킬의 실제 사용 횟수</div>
+  <div class="fig-sub">세션 DB의 skill_view 호출을 전수 집계 · 전 기간</div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 250" role="img" aria-label="삭제된 스킬별 사용 횟수 막대 그래프">
+    <!-- grid -->
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="200" y1="16" x2="200" y2="232"/>
+      <line x1="330" y1="16" x2="330" y2="232"/>
+      <line x1="460" y1="16" x2="460" y2="232"/>
+      <line x1="590" y1="16" x2="590" y2="232"/>
+      <line x1="720" y1="16" x2="720" y2="232"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="middle">
+      <text x="200" y="246">0</text><text x="330" y="246">10</text>
+      <text x="460" y="246">20</text><text x="590" y="246">30</text><text x="720" y="246">40</text>
+    </g>
+    <!-- bars: scale 13px per use, x0=200 -->
+    <g>
+      <rect x="200" y="20"  width="403" height="19" rx="4" fill="var(--s2)"><title>comfyui — 31회</title></rect>
+      <text x="613" y="34" font-size="12" font-weight="600" fill="var(--text-1)">31회</text>
+      <text x="192" y="34" font-size="12" text-anchor="end" fill="var(--text-1)">comfyui</text>
+
+      <rect x="200" y="47" width="338" height="19" rx="4" fill="var(--s2)"><title>youtube-content — 26회</title></rect>
+      <text x="548" y="61" font-size="12" font-weight="600" fill="var(--text-1)">26회</text>
+      <text x="192" y="61" font-size="12" text-anchor="end" fill="var(--text-1)">youtube-content</text>
+
+      <rect x="200" y="74" width="182" height="19" rx="4" fill="var(--s2)"><title>google-workspace — 14회</title></rect>
+      <text x="392" y="88" font-size="12" font-weight="600" fill="var(--text-1)">14회</text>
+      <text x="192" y="88" font-size="12" text-anchor="end" fill="var(--text-1)">google-workspace</text>
+
+      <rect x="200" y="101" width="130" height="19" rx="4" fill="var(--s2)"><title>utility-dashboard-automation — 10회</title></rect>
+      <text x="340" y="115" font-size="12" font-weight="600" fill="var(--text-1)">10회</text>
+      <text x="192" y="115" font-size="12" text-anchor="end" fill="var(--text-1)">utility-dashboard</text>
+
+      <rect x="200" y="128" width="130" height="19" rx="4" fill="var(--s2)"><title>io2026-video-workflow — 10회</title></rect>
+      <text x="340" y="142" font-size="12" font-weight="600" fill="var(--text-1)">10회</text>
+      <text x="192" y="142" font-size="12" text-anchor="end" fill="var(--text-1)">io2026-video</text>
+
+      <rect x="200" y="155" width="78" height="19" rx="4" fill="var(--s2)"><title>notion — 6회</title></rect>
+      <text x="288" y="169" font-size="12" font-weight="600" fill="var(--text-1)">6회</text>
+      <text x="192" y="169" font-size="12" text-anchor="end" fill="var(--text-1)">notion</text>
+
+      <rect x="200" y="182" width="65" height="19" rx="4" fill="var(--s2)"><title>claude-design — 5회</title></rect>
+      <text x="275" y="196" font-size="12" font-weight="600" fill="var(--text-1)">5회</text>
+      <text x="192" y="196" font-size="12" text-anchor="end" fill="var(--text-1)">claude-design</text>
+
+      <rect x="200" y="209" width="52" height="19" rx="4" fill="var(--s2)"><title>himalaya — 4회</title></rect>
+      <text x="262" y="223" font-size="12" font-weight="600" fill="var(--text-1)">4회</text>
+      <text x="192" y="223" font-size="12" text-anchor="end" fill="var(--text-1)">himalaya</text>
+    </g>
+    <line x1="200" y1="16" x2="200" y2="232" stroke="var(--text-2)" stroke-width="1.5"/>
+  </svg>
+  </div>
+  <figcaption>
+    반대로 <strong>한 번도 안 쓴 스킬 95개는 인덱스에 그대로 남아</strong> 있었습니다.
+    삭제와 보존이 정확히 뒤집혀 있었습니다.
+  </figcaption>
+</figure>
+
+<h3>복구 경로도 잘못 안내되고 있었다</h3>
+<p>
+  curator 리포트는 <code>~/.hermes/skills/.archive/</code>에서 복구하라고 안내하는데
+  <strong>그 디렉토리는 실제로 생성되지 않습니다.</strong> 진짜 복구본은
+  <code>.curator_backups/*/skills.tar.gz</code>에만 있고, <code>backup.keep: 5</code> + 주 1회 실행이라
+  <strong>5주치만 보존</strong>됩니다. 그 이전에 삭제된 25개는 영구 유실됐습니다.
+</p>
+
+<div class="note fix">
+  <span class="lbl">조치</span>
+  <p><strong>14개 복구</strong> (내용이 다른 스킬로 흡수된 것은 중복을 피해 제외) ·
+  <strong>31개 핀 고정</strong>(<code>pinned=true</code>는 자동 패스와 LLM 패스 모두 건너뜀) ·
+  <code>stale_after_days</code> 30→120 · <code>archive_after_days</code> 90→365 ·
+  <code>backup.keep</code> 5→12(약 3개월치)</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">02</span>프롬프트 예산 — 어디가 진짜 비만인가</h2>
+
+<p>
+  “스킬이 많아서 느리다”가 흔한 직관입니다. 실측해보니 <strong>세 번째로 중요한 요인</strong>이었습니다.
+</p>
+
+<figure>
+  <div class="fig-title">최근 30일 대화 내용의 구성</div>
+  <div class="fig-sub">세션 DB의 message 길이 합계 · 단위 MB</div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 150" role="img" aria-label="역할별 대화 내용 크기">
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="140" y1="10" x2="140" y2="118"/>
+      <line x1="285" y1="10" x2="285" y2="118"/>
+      <line x1="430" y1="10" x2="430" y2="118"/>
+      <line x1="575" y1="10" x2="575" y2="118"/>
+      <line x1="720" y1="10" x2="720" y2="118"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="middle">
+      <text x="140" y="134">0</text><text x="285" y="134">2.5</text><text x="430" y="134">5.0</text>
+      <text x="575" y="134">7.5</text><text x="720" y="134">10 MB</text>
+    </g>
+    <rect x="140" y="16" width="529" height="26" rx="4" fill="var(--s2)"><title>tool 출력 — 9.13 MB</title></rect>
+    <text x="679" y="34" font-size="13" font-weight="650" fill="var(--text-1)">9.13</text>
+    <text x="132" y="34" font-size="12.5" text-anchor="end" fill="var(--text-1)">툴 출력</text>
+
+    <rect x="140" y="52" width="43" height="26" rx="4" fill="var(--s1)"><title>assistant — 0.75 MB</title></rect>
+    <text x="193" y="70" font-size="13" font-weight="650" fill="var(--text-1)">0.75</text>
+    <text x="132" y="70" font-size="12.5" text-anchor="end" fill="var(--text-1)">AI 답변</text>
+
+    <rect x="140" y="88" width="43" height="26" rx="4" fill="var(--s3)"><title>user — 0.74 MB</title></rect>
+    <text x="193" y="106" font-size="13" font-weight="650" fill="var(--text-1)">0.74</text>
+    <text x="132" y="106" font-size="12.5" text-anchor="end" fill="var(--text-1)">내 입력</text>
+
+    <line x1="140" y1="10" x2="140" y2="118" stroke="var(--text-2)" stroke-width="1.5"/>
+  </svg>
+  </div>
+  <figcaption>
+    <strong>툴 출력이 86%</strong>입니다. 사람이 쓴 글과 AI 답변을 합쳐도 전체의 14%에 불과합니다.
+    컨텍스트를 밀어내는 건 대화가 아니라 툴이 뱉는 데이터였습니다.
+  </figcaption>
+</figure>
+
+<figure>
+  <div class="fig-title">툴별 출력 총량 (최근 30일)</div>
+  <div class="fig-sub">호출 횟수가 아니라 <strong>뱉어낸 양</strong> 기준</div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 260" role="img" aria-label="툴별 출력량">
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="170" y1="10" x2="170" y2="222"/>
+      <line x1="353" y1="10" x2="353" y2="222"/>
+      <line x1="536" y1="10" x2="536" y2="222"/>
+      <line x1="719" y1="10" x2="719" y2="222"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="middle">
+      <text x="170" y="238">0</text><text x="353" y="238">1.0</text>
+      <text x="536" y="238">2.0</text><text x="719" y="238">3.0 MB</text>
+    </g>
+    <g font-size="12">
+      <rect x="170" y="16"  width="533" height="18" rx="4" fill="var(--s1)"><title>read_file — 2.91 MB, 578회, 평균 5,038자</title></rect>
+      <text x="713" y="30" font-size="11.5" font-weight="600" text-anchor="end" fill="#fff">2.91</text>
+      <text x="162" y="30" text-anchor="end" fill="var(--text-1)">read_file</text>
+
+      <rect x="170" y="40" width="300" height="18" rx="4" fill="var(--s1)"><title>web_search — 1.64 MB, 289회</title></rect>
+      <text x="480" y="54" font-size="11.5" font-weight="600" fill="var(--text-1)">1.64</text>
+      <text x="162" y="54" text-anchor="end" fill="var(--text-1)">web_search</text>
+
+      <rect x="170" y="64" width="265" height="18" rx="4" fill="var(--s2)"><title>session_search — 1.45 MB, 단 78회, 평균 18,587자</title></rect>
+      <text x="445" y="78" font-size="11.5" font-weight="600" fill="var(--text-1)">1.45</text>
+      <text x="162" y="78" text-anchor="end" fill="var(--text-1)">session_search</text>
+
+      <rect x="170" y="88" width="123" height="18" rx="4" fill="var(--s1)"><title>patch — 0.67 MB</title></rect>
+      <text x="303" y="102" font-size="11.5" font-weight="600" fill="var(--text-1)">0.67</text>
+      <text x="162" y="102" text-anchor="end" fill="var(--text-1)">patch</text>
+
+      <rect x="170" y="112" width="116" height="18" rx="4" fill="var(--s1)"><title>terminal — 0.63 MB, 582회</title></rect>
+      <text x="296" y="126" font-size="11.5" font-weight="600" fill="var(--text-1)">0.63</text>
+      <text x="162" y="126" text-anchor="end" fill="var(--text-1)">terminal</text>
+
+      <rect x="170" y="136" width="96" height="18" rx="4" fill="var(--s1)"><title>skill_view — 0.52 MB</title></rect>
+      <text x="276" y="150" font-size="11.5" font-weight="600" fill="var(--text-1)">0.52</text>
+      <text x="162" y="150" text-anchor="end" fill="var(--text-1)">skill_view</text>
+
+      <rect x="170" y="160" width="89" height="18" rx="4" fill="var(--s1)"><title>web_extract — 0.49 MB</title></rect>
+      <text x="269" y="174" font-size="11.5" font-weight="600" fill="var(--text-1)">0.49</text>
+      <text x="162" y="174" text-anchor="end" fill="var(--text-1)">web_extract</text>
+
+      <rect x="170" y="184" width="42" height="18" rx="4" fill="var(--s1)"><title>browser_navigate — 0.23 MB</title></rect>
+      <text x="222" y="198" font-size="11.5" font-weight="600" fill="var(--text-1)">0.23</text>
+      <text x="162" y="198" text-anchor="end" fill="var(--text-1)">browser_navigate</text>
+
+      <rect x="170" y="208" width="24" height="18" rx="4" fill="var(--s1)"><title>search_files — 0.13 MB</title></rect>
+      <text x="204" y="222" font-size="11.5" font-weight="600" fill="var(--text-1)">0.13</text>
+      <text x="162" y="222" text-anchor="end" fill="var(--text-1)">search_files</text>
+    </g>
+    <line x1="170" y1="10" x2="170" y2="228" stroke="var(--text-2)" stroke-width="1.5"/>
+  </svg>
+  </div>
+  <figcaption>
+    주황색 <code>session_search</code>가 특이합니다 — <strong>호출은 78회뿐인데 평균 18,587자</strong>
+    (약 4,600토큰), 최대 73,328자입니다. 78회 중 24회가 2만 자를 넘겼습니다.
+    <code>read_file</code>은 평균 5,038자지만 578회라 총량 1위입니다.
+  </figcaption>
+</figure>
+
+<div class="note bad">
+  <span class="lbl">원인</span>
+  <p>기본 설정이 지나치게 관대했습니다. <code>tool_output.max_bytes: 50000</code>(≈12,500토큰),
+  <code>file_read_max_chars: 100000</code>(≈25,000토큰) — <strong>툴 하나가 컨텍스트의 1/5을
+  먹을 수 있게</strong> 열려 있었습니다.</p>
+</div>
+
+<h3>세 가지 레버의 실제 효과</h3>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>레버</th><th class="num">절감</th><th>비고</th></tr></thead>
+  <tbody>
+    <tr><td><strong>① 툴 출력 상한</strong> <code>50000→16000</code>, <code>100000→40000</code></td>
+        <td class="num">가장 큼</td><td>대화 내용의 86%를 차지하던 원인을 직접 차단</td></tr>
+    <tr><td><strong>② 미사용 툴셋 비활성화</strong> <code>tts, image_gen, delegation</code></td>
+        <td class="num">2,171 토큰</td><td><code>delegate_task</code> 하나가 1,728토큰인데 전 기간 3회 사용</td></tr>
+    <tr><td><strong>③ 스킬 다이어트</strong> 45개 비활성화</td>
+        <td class="num">1,016 토큰</td><td>4,089 → 3,073 토큰</td></tr>
+  </tbody>
+</table>
+</div>
+
+<figure>
+  <div class="fig-title">매 호출 고정 오버헤드</div>
+  <div class="fig-sub">시스템 프롬프트 + 툴 스키마 · 대화 이력 제외</div>
+  <div class="legend">
+    <span><i class="swatch" style="background:var(--s2)"></i>이전</span>
+    <span><i class="swatch" style="background:var(--s1)"></i>이후</span>
+  </div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 200" role="img" aria-label="고정 오버헤드 이전 이후 비교">
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="150" y1="8" x2="150" y2="160"/>
+      <line x1="292" y1="8" x2="292" y2="160"/>
+      <line x1="434" y1="8" x2="434" y2="160"/>
+      <line x1="576" y1="8" x2="576" y2="160"/>
+      <line x1="718" y1="8" x2="718" y2="160"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="middle">
+      <text x="150" y="176">0</text><text x="292" y="176">5K</text><text x="434" y="176">10K</text>
+      <text x="576" y="176">15K</text><text x="718" y="176">20K 토큰</text>
+    </g>
+    <!-- 스킬 인덱스 -->
+    <text x="142" y="30" font-size="12" text-anchor="end" fill="var(--text-1)">스킬 인덱스</text>
+    <rect x="150" y="18" width="116" height="16" rx="4" fill="var(--s2)"><title>이전 4,089 토큰</title></rect>
+    <text x="274" y="31" font-size="11.5" fill="var(--text-2)">4,089</text>
+    <rect x="150" y="38" width="87" height="16" rx="4" fill="var(--s1)"><title>이후 3,073 토큰</title></rect>
+    <text x="245" y="51" font-size="11.5" font-weight="600" fill="var(--text-1)">3,073</text>
+
+    <!-- 툴 스키마 -->
+    <text x="142" y="82" font-size="12" text-anchor="end" fill="var(--text-1)">툴 스키마</text>
+    <rect x="150" y="70" width="350" height="16" rx="4" fill="var(--s2)"><title>이전 12,325 토큰 (32개 툴)</title></rect>
+    <text x="508" y="83" font-size="11.5" fill="var(--text-2)">12,325</text>
+    <rect x="150" y="90" width="288" height="16" rx="4" fill="var(--s1)"><title>이후 10,154 토큰 (29개 툴)</title></rect>
+    <text x="446" y="103" font-size="11.5" font-weight="600" fill="var(--text-1)">10,154</text>
+
+    <!-- 합계 -->
+    <text x="142" y="134" font-size="12" text-anchor="end" font-weight="600" fill="var(--text-1)">합계</text>
+    <rect x="150" y="122" width="516" height="16" rx="4" fill="var(--s2)"><title>이전 18,169 토큰</title></rect>
+    <text x="674" y="135" font-size="11.5" fill="var(--text-2)">18,169</text>
+    <rect x="150" y="142" width="425" height="16" rx="4" fill="var(--s1)"><title>이후 14,982 토큰</title></rect>
+    <text x="583" y="155" font-size="12" font-weight="700" fill="var(--text-1)">14,982 (-17.5%)</text>
+
+    <line x1="150" y1="8" x2="150" y2="160" stroke="var(--text-2)" stroke-width="1.5"/>
+  </svg>
+  </div>
+  <figcaption>
+    스킬 다이어트만 보면 1,016토큰으로 소박합니다. 시스템 프롬프트 안에서는 스킬이 75%를 차지하지만,
+    <strong>시스템 프롬프트 자체가 툴 스키마의 절반</strong>이라 체감 효과가 작습니다.
+    이 표는 “가장 눈에 띄는 것”과 “가장 효과 큰 것”이 다르다는 걸 보여줍니다.
+  </figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">03</span>작업이 중간에 끊기고 있었다</h2>
+
+<p>
+  <code>agent.max_turns</code>가 <strong>10</strong>으로 설정돼 있었습니다. 기본값은 <strong>90</strong>입니다.
+  실제로 문제였는지 세션 데이터로 확인했습니다.
+</p>
+
+<figure>
+  <div class="fig-title">세션당 툴 호출 횟수 분포 (최근 30일, 145세션)</div>
+  <div class="fig-sub">점선 = 기존 <code>max_turns: 10</code> 한계선</div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 240" role="img" aria-label="세션당 툴 호출 분포">
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="70" y1="30"  x2="700" y2="30"/>
+      <line x1="70" y1="75"  x2="700" y2="75"/>
+      <line x1="70" y1="120" x2="700" y2="120"/>
+      <line x1="70" y1="165" x2="700" y2="165"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="end">
+      <text x="62" y="34">60</text><text x="62" y="79">40</text>
+      <text x="62" y="124">20</text><text x="62" y="169">0</text>
+    </g>
+    <!-- baseline y=210 ; scale: 60 -> 180px  => px = v*3 -->
+    <g>
+      <rect x="90"  y="96"  width="94" height="114" rx="4" fill="var(--s3)"><title>툴 호출 0회 — 38세션</title></rect>
+      <text x="137" y="88" font-size="13" font-weight="650" text-anchor="middle" fill="var(--text-1)">38</text>
+      <text x="137" y="228" font-size="11.5" text-anchor="middle" fill="var(--text-2)">0회</text>
+
+      <rect x="204" y="183" width="94" height="27" rx="4" fill="var(--s3)"><title>1–5회 — 9세션</title></rect>
+      <text x="251" y="175" font-size="13" font-weight="650" text-anchor="middle" fill="var(--text-1)">9</text>
+      <text x="251" y="228" font-size="11.5" text-anchor="middle" fill="var(--text-2)">1–5회</text>
+
+      <rect x="318" y="177" width="94" height="33" rx="4" fill="var(--s3)"><title>6–10회 — 11세션</title></rect>
+      <text x="365" y="169" font-size="13" font-weight="650" text-anchor="middle" fill="var(--text-1)">11</text>
+      <text x="365" y="228" font-size="11.5" text-anchor="middle" fill="var(--text-2)">6–10회</text>
+
+      <rect x="432" y="102" width="94" height="108" rx="4" fill="var(--s2)"><title>11–20회 — 36세션 · 기존 한계 초과</title></rect>
+      <text x="479" y="94" font-size="13" font-weight="650" text-anchor="middle" fill="var(--text-1)">36</text>
+      <text x="479" y="228" font-size="11.5" text-anchor="middle" fill="var(--text-2)">11–20회</text>
+
+      <rect x="546" y="57" width="94" height="153" rx="4" fill="var(--s2)"><title>21회 이상 — 51세션 · 기존 한계 초과</title></rect>
+      <text x="593" y="49" font-size="13" font-weight="650" text-anchor="middle" fill="var(--text-1)">51</text>
+      <text x="593" y="228" font-size="11.5" text-anchor="middle" fill="var(--text-2)">21회+</text>
+    </g>
+    <line x1="70" y1="210" x2="700" y2="210" stroke="var(--text-2)" stroke-width="1.5"/>
+    <!-- limit marker -->
+    <line x1="422" y1="20" x2="422" y2="212" stroke="var(--critical)" stroke-width="2" stroke-dasharray="5 4"/>
+    <text x="428" y="18" font-size="11.5" font-weight="600" fill="var(--critical)">max_turns: 10</text>
+  </svg>
+  </div>
+  <figcaption>
+    <strong>145세션 중 87개(60%)가 툴 호출 10회를 넘겼습니다.</strong> 즉 대부분의 실제 작업에서
+    한계에 걸리고 있었습니다. 60일간 세션 종료 사유 1위가 <code>compression</code> 305건이었던 것도 같은 맥락입니다.
+    → <code>max_turns</code>를 <strong>60</strong>으로 올렸습니다.
+  </figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">04</span>메모리가 아니라 시간이 컨텍스트를 결정한다</h2>
+
+<p>
+  기존 README는 “131K 컨텍스트 = 63GB, 위험”이라고 적고 있었습니다. 이 숫자가 맞는지 확인하려고
+  모델 <code>config.json</code>을 열었더니 <strong>일반적인 KV 캐시 공식이 이 모델엔 통하지 않는다</strong>는 걸 발견했습니다.
+</p>
+
+<pre><code>full_attention_interval: 4
+layer_types: [linear, linear, linear, full, linear, linear, linear, full, ...]
+num_hidden_layers: 40   →   full_attention은 10개뿐</code></pre>
+
+<p>
+  Qwen3.6은 <strong>하이브리드 어텐션</strong>입니다. 40개 레이어 중 10개만 full attention이고,
+  나머지 30개는 <code>linear_attention</code>(Mamba 계열)이라 <strong>시퀀스 길이와 무관하게 상태 크기가 고정</strong>입니다.
+  컨텍스트에 비례해 자라는 건 10개뿐이므로, 40레이어로 계산한 기존 값은 <strong>4배 과대추정</strong>이었습니다.
+</p>
+
+<div class="note fix">
+  <span class="lbl">실측</span>
+  <p><strong>178,000 토큰을 처리하는 동안 프로세스 메모리가 19.9GB → 20.1GB로 사실상 변하지 않았습니다.</strong>
+  64GB에서 이 모델의 메모리는 어떤 컨텍스트에서도 제약이 아닙니다.</p>
+</div>
+
+<figure>
+  <div class="fig-title">프리필 시간 — 진짜 제약</div>
+  <div class="fig-sub">프롬프트 캐시 미적중 기준 · 어텐션의 제곱 비용이 그대로 드러남</div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 270" role="img" aria-label="컨텍스트 크기별 프리필 소요 시간">
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="80" y1="30"  x2="700" y2="30"/>
+      <line x1="80" y1="75"  x2="700" y2="75"/>
+      <line x1="80" y1="120" x2="700" y2="120"/>
+      <line x1="80" y1="165" x2="700" y2="165"/>
+      <line x1="80" y1="210" x2="700" y2="210"/>
+    </g>
+    <g fill="var(--text-3)" font-size="10.5" text-anchor="end">
+      <text x="72" y="34">300</text><text x="72" y="79">225</text><text x="72" y="124">150</text>
+      <text x="72" y="169">75</text><text x="72" y="214">0</text>
+    </g>
+    <text x="30" y="130" font-size="11" fill="var(--text-3)" transform="rotate(-90 30 130)" text-anchor="middle">초</text>
+    <!-- baseline 210, scale 300s -> 180px => px = v*0.6 -->
+    <g>
+      <rect x="105" y="209" width="88" height="1"  rx="1" fill="var(--s1)"><title>7K 토큰 — 1.7초</title></rect>
+      <text x="149" y="201" font-size="12" font-weight="650" text-anchor="middle" fill="var(--text-1)">1.7초</text>
+      <text x="149" y="232" font-size="11.5" text-anchor="middle" fill="var(--text-2)">7K</text>
+
+      <rect x="221" y="203" width="88" height="7"  rx="3" fill="var(--s1)"><title>28K 토큰 — 11.9초</title></rect>
+      <text x="265" y="195" font-size="12" font-weight="650" text-anchor="middle" fill="var(--text-1)">11.9초</text>
+      <text x="265" y="232" font-size="11.5" text-anchor="middle" fill="var(--text-2)">28K</text>
+
+      <rect x="337" y="191" width="88" height="19" rx="4" fill="var(--s1)"><title>57K 토큰 — 31.3초</title></rect>
+      <text x="381" y="183" font-size="12" font-weight="650" text-anchor="middle" fill="var(--text-1)">31.3초</text>
+      <text x="381" y="232" font-size="11.5" text-anchor="middle" fill="var(--text-2)">57K</text>
+
+      <rect x="453" y="178" width="88" height="32" rx="4" fill="var(--s1)"><title>89K 토큰 — 53.5초</title></rect>
+      <text x="497" y="170" font-size="12" font-weight="650" text-anchor="middle" fill="var(--text-1)">53.5초</text>
+      <text x="497" y="232" font-size="11.5" text-anchor="middle" fill="var(--text-2)">89K</text>
+
+      <rect x="569" y="42" width="88" height="168" rx="4" fill="var(--s2)"><title>178K 토큰 — 279.7초 (4분 40초)</title></rect>
+      <text x="613" y="34" font-size="12.5" font-weight="700" text-anchor="middle" fill="var(--text-1)">279.7초</text>
+      <text x="613" y="232" font-size="11.5" text-anchor="middle" fill="var(--text-2)">178K</text>
+      <text x="613" y="250" font-size="11" text-anchor="middle" fill="var(--s2)">4분 40초</text>
+    </g>
+    <line x1="80" y1="210" x2="700" y2="210" stroke="var(--text-2)" stroke-width="1.5"/>
+  </svg>
+  </div>
+  <figcaption>
+    89K → 178K에서 <strong>토큰은 2배인데 시간은 5.2배</strong>입니다. 따라서 컨텍스트 상한은
+    “메모리에 맞는가”가 아니라 <strong>“그 길이를 다시 읽는 데 몇 분을 쓸 것인가”</strong>로 정해야 합니다.
+  </figcaption>
+</figure>
+
+<h3>상한은 열되, 압축 발동점은 고정</h3>
+<p>
+  <code>compression.threshold</code>는 컨텍스트 상한에 대한 <strong>비율</strong>입니다
+  (<code>threshold_tokens = context_length × threshold</code>). 그래서 상한만 올리면
+  압축 발동점도 함께 밀려나 “183K까지 쌓아두고 매번 4분씩 다시 읽는” 최악이 됩니다.
+</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>설정</th><th class="num">이전</th><th class="num">이후</th><th>효과</th></tr></thead>
+  <tbody>
+    <tr><td><code>model.max_tokens</code></td><td class="num">131,072</td><td class="num">262,144</td><td>모델 최대치까지 여유 확보</td></tr>
+    <tr><td><code>compression.threshold</code></td><td class="num">0.7</td><td class="num">0.35</td><td>비율을 낮춰 상쇄</td></tr>
+    <tr><td><strong>실제 압축 발동점</strong></td><td class="num">91,750</td><td class="num">91,750</td><td><strong>변화 없음</strong> — 평소 동작 동일</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">05</span>모델 교체 — 4bit → 4bit-DWQ</h2>
+
+<p>
+  DWQ(Distilled Weight Quantization)는 양자화된 가중치가 원본 모델의 출력을 따라가도록
+  <strong>증류 학습</strong>시킨 것입니다. 구조·크기·비트폭이 같으니 연산량은 그대로고 가중치 값만 개선됩니다.
+</p>
+
+<figure>
+  <div class="fig-title">에이전트 과제 수행 비교</div>
+  <div class="fig-sub">동일 조건(<code>model_settings.json</code> 전부 일치) · 2회 독립 실행 평균 · 6개 tool call 과제</div>
+  <div class="legend">
+    <span><i class="swatch" style="background:var(--s2)"></i>4bit (이전)</span>
+    <span><i class="swatch" style="background:var(--s1)"></i>4bit-DWQ (현재)</span>
+  </div>
+  <div class="chart-scroll">
+  <svg viewBox="0 0 720 230" role="img" aria-label="4bit 대 DWQ 비교">
+    <!-- panel 1: 완료 시간 -->
+    <text x="20" y="20" font-size="12.5" font-weight="600" fill="var(--text-1)">과제 완료 시간 (초, 낮을수록 좋음)</text>
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="20" y1="90" x2="330" y2="90"/><line x1="20" y1="60" x2="330" y2="60"/>
+    </g>
+    <rect x="40"  y="34" width="88" height="56" rx="4" fill="var(--s2)"><title>4bit — 평균 58.2초 (52.4 / 63.9)</title></rect>
+    <text x="84" y="26" font-size="14" font-weight="700" text-anchor="middle" fill="var(--text-1)">58.2</text>
+    <rect x="160" y="57" width="88" height="33" rx="4" fill="var(--s1)"><title>DWQ — 평균 33.8초 (36.3 / 31.3)</title></rect>
+    <text x="204" y="49" font-size="14" font-weight="700" text-anchor="middle" fill="var(--text-1)">33.8</text>
+    <line x1="20" y1="90" x2="330" y2="90" stroke="var(--text-2)" stroke-width="1.5"/>
+    <text x="175" y="106" font-size="12" text-anchor="middle" font-weight="600" fill="var(--s1)">42% 단축</text>
+
+    <!-- panel 2: 완료 토큰 -->
+    <text x="390" y="20" font-size="12.5" font-weight="600" fill="var(--text-1)">완료까지 쓴 토큰 (중앙값)</text>
+    <g stroke="var(--grid)" stroke-width="1">
+      <line x1="390" y1="90" x2="700" y2="90"/><line x1="390" y1="60" x2="700" y2="60"/>
+    </g>
+    <rect x="410" y="34" width="88" height="56" rx="4" fill="var(--s2)"><title>4bit — 695 토큰 (최대 1,839)</title></rect>
+    <text x="454" y="26" font-size="14" font-weight="700" text-anchor="middle" fill="var(--text-1)">695</text>
+    <rect x="530" y="66" width="88" height="24" rx="4" fill="var(--s1)"><title>DWQ — 303 토큰 (최대 953)</title></rect>
+    <text x="574" y="58" font-size="14" font-weight="700" text-anchor="middle" fill="var(--text-1)">303</text>
+    <line x1="390" y1="90" x2="700" y2="90" stroke="var(--text-2)" stroke-width="1.5"/>
+    <text x="545" y="106" font-size="12" text-anchor="middle" font-weight="600" fill="var(--s1)">2.3배 절약</text>
+
+    <!-- panel 3: 나머지는 동일 -->
+    <text x="20" y="146" font-size="12.5" font-weight="600" fill="var(--text-1)">나머지 지표는 사실상 동일 (교대 측정으로 확인)</text>
+    <g font-size="11.5" fill="var(--text-2)">
+      <rect x="20" y="158" width="200" height="26" rx="4" fill="var(--surface-2)"/>
+      <text x="30" y="175">프리필 40K</text>
+      <text x="210" y="175" text-anchor="end" fill="var(--text-1)">17.9s → 18.5s</text>
+
+      <rect x="236" y="158" width="200" height="26" rx="4" fill="var(--surface-2)"/>
+      <text x="246" y="175">생성 속도</text>
+      <text x="426" y="175" text-anchor="end" fill="var(--text-1)">44.9 → 48.2 tok/s</text>
+
+      <rect x="452" y="158" width="200" height="26" rx="4" fill="var(--surface-2)"/>
+      <text x="462" y="175">모델 크기</text>
+      <text x="642" y="175" text-anchor="end" fill="var(--text-1)">19.0 → 19.3 GB</text>
+
+      <rect x="20" y="190" width="200" height="26" rx="4" fill="var(--surface-2)"/>
+      <text x="30" y="207">컨텍스트</text>
+      <text x="210" y="207" text-anchor="end" fill="var(--text-1)">262,144 (동일)</text>
+
+      <rect x="236" y="190" width="200" height="26" rx="4" fill="var(--surface-2)"/>
+      <text x="246" y="207">tool call 정확도</text>
+      <text x="426" y="207" text-anchor="end" font-weight="700" fill="var(--good)">5/6 → 6/6</text>
+    </g>
+  </svg>
+  </div>
+  <figcaption>
+    4bit는 <strong>두 실행 모두 같은 <code>web_search</code> 과제에서 1,839토큰을 쓰고도
+    도구를 호출하지 못한 채 종료</strong>했습니다(<code>finish_reason=stop</code>). 재현되는 결함입니다.
+    DWQ가 42% 빠른 이유는 생성 속도가 아니라 <strong>reasoning 토큰을 2.3배 덜 쓰기 때문</strong>이고,
+    이는 에이전트에서 복리로 작용합니다 — 출력이 짧으면 다음 턴에 프리필할 이력도 짧아집니다.
+  </figcaption>
+</figure>
+
+<div class="note warn">
+  <span class="lbl">교체 시 반드시 확인할 것</span>
+  <p><strong>DWQ는 비전 가중치가 빠진 텍스트 전용 빌드입니다.</strong>
+  <code>vision_config</code>도 <code>preprocessor_config.json</code>도 없고, oMLX가
+  <code>engine: batched / type: llm</code>으로 인식합니다(기존 4bit는 <code>vlm</code>).
+  메인을 DWQ로 쓰려면 <code>auxiliary.vision</code>을 VLM으로 <strong>반드시 따로 지정</strong>해야 합니다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">06</span>보조 모델 — 크기가 아니라 thinking이 문제였다</h2>
+
+<p>
+  Hermes는 12개 부수 작업(제목 생성, 승인 판단, 압축, 비전 등)에 각각 다른 모델을 지정할 수 있습니다.
+  <code>provider: auto</code>는 <strong>메인 모델</strong>을 뜻합니다.
+  “가벼운 일엔 작은 모델”이 자연스러운 발상이지만, 측정해보니 문제가 다른 데 있었습니다.
+</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>설정</th><th class="num">소요</th><th class="num">토큰</th><th>결과</th></tr></thead>
+  <tbody>
+    <tr><td>메인 모델, thinking ON, <code>max_tokens=200</code></td><td class="num">2.4초</td><td class="num">200</td><td>답 없음 (추론 중 잘림)</td></tr>
+    <tr><td>메인 모델, thinking ON, <code>max_tokens=600</code></td><td class="num">6.4초</td><td class="num">600</td><td>답 없음</td></tr>
+    <tr><td>메인 모델, thinking ON, <code>max_tokens=1500</code></td><td class="num">15.2초</td><td class="num">1,500</td><td>답 없음</td></tr>
+    <tr><td><strong>메인 모델, thinking OFF</strong></td><td class="num"><strong>0.53초</strong></td><td class="num"><strong>8</strong></td><td><strong>“유튜브 편집 추임새 자동 제거”</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>
+  “제목을 5단어로” 같은 요청에 <strong>1,500토큰 15초를 쓰고도 답을 못 냅니다.</strong>
+  reasoning 모델이라 짧은 작업에서 추론에 예산을 다 쓰기 때문입니다.
+  <code>auxiliary.&lt;task&gt;.extra_body</code>가 이걸 제어하는 통로였습니다.
+</p>
+
+<pre><code>auxiliary:
+  title_generation:
+    extra_body:
+      chat_template_kwargs:
+        enable_thinking: false</code></pre>
+
+<h3>모델별 한국어 품질과 판단력</h3>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>모델</th><th class="num">크기</th><th class="num">속도</th><th>한국어 출력</th><th>위험 명령 판단</th></tr></thead>
+  <tbody>
+    <tr><td>DWQ (thinking OFF)</td><td class="num">20.2 GB</td><td class="num">0.53s</td>
+        <td><span class="tag ok">깔끔</span></td>
+        <td><span class="tag no">rm -rf ~/Projects를 SAFE로 오판</span></td></tr>
+    <tr><td>gemma-4-12B</td><td class="num">8.8 GB</td><td class="num">0.37s</td>
+        <td><span class="tag ok">깔끔</span></td>
+        <td><span class="tag no">실행마다 흔들림</span></td></tr>
+    <tr><td>Llama-3.2-3B</td><td class="num">1.8 GB</td><td class="num">0.11s</td>
+        <td><span class="tag no">외국어 혼입</span> <code>tự động</code> <code>用的</code> <code>उपय</code></td>
+        <td><span class="tag ok">3/3 정답</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note bad">
+  <span class="lbl">안전 관련</span>
+  <p><strong>위험 명령 판단은 어느 모델도 신뢰할 수 없습니다.</strong> 그래서 판단이 필요한 작업
+  (<code>approval</code>, <code>curator</code>, <code>triage_specifier</code>)은 thinking을 유지했고,
+  파괴적 명령은 모델이 아니라 규칙으로 막도록 <code>command_allowlist</code>에서
+  <code>delete in root path</code> 사전승인을 제거했습니다.</p>
+</div>
+
+<h3>작업별 최종 배치</h3>
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>부류</th><th>작업</th><th>설정</th><th>이유</th></tr></thead>
+  <tbody>
+    <tr><td>비전</td><td><code>vision</code></td><td>VLM 명시</td><td>메인이 텍스트 전용이라 필수</td></tr>
+    <tr><td>포맷팅</td><td><code>title_generation</code>, <code>profile_describer</code></td><td>메인 + thinking OFF</td><td>판단 불필요 · 15초 → 0.5초</td></tr>
+    <tr><td>판단</td><td><code>approval</code>, <code>curator</code>, <code>triage_specifier</code>, <code>kanban_decomposer</code></td><td>메인 + thinking 유지</td><td>추론을 끄면 오판</td></tr>
+    <tr><td>요약</td><td><code>compression</code></td><td><code>gemma-4-12B</code></td><td>빠르고 한국어 깔끔</td></tr>
+  </tbody>
+</table>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">07</span>검토했지만 켜지 않은 것</h2>
+
+<p>최적화 후보를 다 켜는 게 답은 아닙니다. 두 기능은 측정 결과 <strong>끄는 게 맞았습니다.</strong></p>
+
+<h3><code>chunked_prefill</code> — 이득 0, 페널티 3% <span class="tag no">OFF 유지</span></h3>
+<p>
+  문서가 이득의 조건을 명시합니다 — <em>“Reduces TTFT <strong>for concurrent requests</strong>
+  at the cost of per-step overhead.”</em> 그런데 이 서버는 <code>max_concurrent_requests: 1</code>이라
+  끼워넣을 다른 요청이 없습니다.
+</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>설정</th><th class="num">측정값 (40K 프리필, 3라운드 교대)</th><th class="num">중앙값</th></tr></thead>
+  <tbody>
+    <tr><td>OFF</td><td class="num">25.2 / 26.0 / 26.3초</td><td class="num"><strong>26.0초</strong></td></tr>
+    <tr><td>ON</td><td class="num">26.7 / 26.7 / 27.1초</td><td class="num">26.7초</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+  중앙값 차이는 3%로 작지만 <strong>ON 3개가 모두 OFF 3개보다 높아 범위가 겹치지 않습니다.</strong>
+  우연이라기엔 일관적이고, 문서가 말한 오버헤드와 정확히 일치합니다.
+</p>
+
+<h3><code>specprefill</code> — 속도가 아니라 정확도를 거래하는 기법 <span class="tag no">OFF 유지</span></h3>
+<pre><code>DEFAULT_KEEP_RATE = 0.20   → 프롬프트 토큰의 80%를 버림
+DEFAULT_THRESHOLD = 8192   → 8K 넘는 프롬프트마다 발동</code></pre>
+<ul>
+  <li>평균 프리필이 6만 토큰이라 <strong>거의 매 호출 발동해 대부분을 버립니다.</strong></li>
+  <li>draft 모델은 타깃과 토크나이저를 공유해야 하는데
+      <strong>Qwen3.6 계열에 8B 이하 모델이 존재하지 않습니다</strong>(HF 전수 확인).</li>
+  <li>논문의 7.66× 개선은 <strong>Llama-3.1-405B</strong> 기준입니다.
+      Qwen3.6-35B-A3B는 활성 파라미터가 3B인 MoE라 타깃 자체가 이미 싸서 경제성이 정반대입니다.</li>
+  <li>프롬프트 캐시 적중률이 93%라 최적화하려는 전체 프리필 자체가 드뭅니다.</li>
+</ul>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">08</span>정리 — 디스크와 로그</h2>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>항목</th><th class="num">회수</th><th>내용</th></tr></thead>
+  <tbody>
+    <tr><td>LM Studio 중복 모델</td><td class="num">54 GB</td>
+        <td>35B 4bit·8bit — oMLX가 별도 사본을 갖고 있고 <code>.lmstudio</code>는 어디서도 참조되지 않음을 확인 후 삭제</td></tr>
+    <tr><td><code>state.db-wal</code></td><td class="num">495 MB</td>
+        <td>과거 대형 트랜잭션의 고수위 표시 · <code>PRAGMA wal_checkpoint(TRUNCATE)</code></td></tr>
+    <tr><td>Telegram 통합</td><td class="num">—</td>
+        <td>7/11 이후 미사용, 에러 로그의 대부분을 차지 → 비활성화(값은 <code>.env</code>에 주석 보존)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>로그 회전 — <code>mv</code>로 하면 안 되는 이유</h3>
+<p>
+  <code>config.yaml</code>의 <code>logging.max_size_mb</code>는 Python 로거가 쓰는 <code>agent.log</code>에만
+  적용됩니다. <code>gateway.error.log</code>는 launchd가 <code>StandardErrorPath</code>로 직접
+  리다이렉트하는 파일이라 규칙 밖이고 무한정 자랍니다.
+</p>
+<div class="note">
+  <span class="lbl">핵심 제약</span>
+  <p>게이트웨이 프로세스가 이 파일을 <code>fd=2</code>로 붙들고 있습니다. <code>mv</code>로 옮기면
+  프로세스는 <strong>이동된 inode에 계속 쓰므로</strong> 새 파일은 영영 비어 있습니다.
+  그래서 <strong>copytruncate</strong> — 내용을 복사한 뒤 원본을 제자리에서 비웁니다(<code>: &gt; file</code>).
+  fd가 유지되어 재시작 없이 회전됩니다.</p>
+</div>
+<p>
+  <code>rotate-logs.sh</code> + 사용자 레벨 launchd 에이전트(매일 04:00, sudo 불필요)로 구성했고,
+  회전 후 inode 유지 · offset 0부터 정상 기록 · 세대 밀어내기 · KEEP=3 정리를 모두 확인했습니다.
+</p>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">09</span>측정하면서 틀렸던 것들</h2>
+
+<p>
+  이 작업에서 <strong>네 번 잘못된 결론에 도달했다가 재측정으로 뒤집었습니다.</strong>
+  모두 “그럴듯한 숫자”를 만들어내는 종류라 검증 없이는 걸러지지 않습니다.
+</p>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>잘못된 결론</th><th>원인</th><th>실제</th></tr></thead>
+  <tbody>
+    <tr><td>“DWQ 프리필이 2배 느리다”</td>
+        <td><strong>순서 효과</strong> — 두 번째로 도는 모델이 항상 느림(발열·드리프트)</td>
+        <td>교대 측정하니 <strong>1.03배, 노이즈 범위</strong></td></tr>
+    <tr><td>“4bit 프리필 91,385 tok/s”</td>
+        <td><strong>프롬프트 캐시 적중</strong> — 같은 텍스트 재사용</td>
+        <td>고유 텍스트로 재측정 시 <strong>1,782 tok/s</strong></td></tr>
+    <tr><td>“131K는 63GB로 위험”</td>
+        <td>하이브리드 어텐션 미반영 — 40레이어로 계산</td>
+        <td>full attention은 <strong>10개뿐</strong>, 메모리는 제약이 아님</td></tr>
+    <tr><td>“8bit는 tool call을 못 한다”</td>
+        <td>응답이 <strong>reasoning 도중 200토큰에서 잘림</strong></td>
+        <td>예산을 늘리니 정상 동작</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="note">
+  <span class="lbl">그래서 얻은 측정 원칙</span>
+  <p>① <strong>교대 측정</strong>(A,B,A,B)으로 드리프트를 상쇄한다 &nbsp;·&nbsp;
+     ② 매 측정마다 <strong>고유 텍스트</strong>를 쓰고 <code>cached_tokens == 0</code>을 확인한다 &nbsp;·&nbsp;
+     ③ <code>tok/s</code> 같은 중간 지표가 아니라 <strong>“과제를 끝내는 데 걸린 총 시간과 토큰”</strong>을 본다</p>
+  <p>실제로 <strong>tok/s가 낮은 모델이 과제 완료는 42% 빨랐습니다.</strong> 중간 지표만 봤다면
+  정반대 결론을 내렸을 겁니다.</p>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ -->
+<h2><span class="num">10</span>전체 변경 내역</h2>
+
+<div class="tbl-scroll">
+<table>
+  <thead><tr><th>항목</th><th class="num">이전</th><th class="num">이후</th></tr></thead>
+  <tbody>
+    <tr><td><code>model.default</code></td><td class="num">Qwen3.6-35B-A3B-4bit</td><td class="num">Qwen3.6-35B-A3B-4bit-DWQ</td></tr>
+    <tr><td><code>model.max_tokens</code></td><td class="num">131,072</td><td class="num">262,144</td></tr>
+    <tr><td><code>compression.threshold</code></td><td class="num">0.7</td><td class="num">0.35</td></tr>
+    <tr><td><code>agent.max_turns</code></td><td class="num">10</td><td class="num">60</td></tr>
+    <tr><td><code>tool_output.max_bytes</code></td><td class="num">50,000</td><td class="num">16,000</td></tr>
+    <tr><td><code>file_read_max_chars</code></td><td class="num">100,000</td><td class="num">40,000</td></tr>
+    <tr><td><code>agent.disabled_toolsets</code></td><td class="num">(없음)</td><td class="num">tts, image_gen, delegation</td></tr>
+    <tr><td><code>skills.disabled</code></td><td class="num">9개</td><td class="num">45개</td></tr>
+    <tr><td><code>curator.stale_after_days</code></td><td class="num">30</td><td class="num">120</td></tr>
+    <tr><td><code>curator.archive_after_days</code></td><td class="num">90</td><td class="num">365</td></tr>
+    <tr><td><code>curator.backup.keep</code></td><td class="num">5</td><td class="num">12</td></tr>
+    <tr><td><code>streaming.enabled</code></td><td class="num">false</td><td class="num">true</td></tr>
+    <tr><td><code>providers.omlx.default_model</code></td><td class="num">…OptiQ-4bit (미존재)</td><td class="num">…-4bit-DWQ</td></tr>
+    <tr><td><code>custom_providers</code></td><td class="num">Open WebUI (인증 불가)</td><td class="num">(제거)</td></tr>
+    <tr><td><code>auxiliary.vision.model</code></td><td class="num">(메인 모델)</td><td class="num">Qwen3.6-35B-A3B-4bit (VLM)</td></tr>
+    <tr><td><code>command_allowlist</code></td><td class="num">delete in root path 포함</td><td class="num">제거</td></tr>
+    <tr><td>평문 비밀값 (config.yaml)</td><td class="num">2건</td><td class="num">0건 (<code>.env</code> + <code>${VAR}</code>)</td></tr>
+    <tr><td>핀 고정 스킬</td><td class="num">0개</td><td class="num">31개</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>되돌리는 법</h3>
+<pre><code># 모델을 이전 4bit로
+hermes config set model.default Qwen3.6-35B-A3B-4bit
+hermes config set providers.omlx.default_model Qwen3.6-35B-A3B-4bit
+hermes gateway restart
+
+# Telegram 되살리기 — .env 의 주석 3줄 해제 후 두 값을 고쳐야 함
+#   TELEGRAM_ALLOWED_USERS=8001678045   (비어 있으면 전원 차단)
+#   TELEGRAM_HOME_CHANNEL=&lt;숫자 id&gt;      (@사용자명 은 int() 오류)
+
+# 로그 회전 해제
+launchctl unload ~/Library/LaunchAgents/ai.hermes.logrotate.plist</code></pre>
+
+<h3>남겨둔 것</h3>
+<ul>
+  <li><strong><code>~/.omlx/cache</code> 185GB</strong> — 프롬프트 캐시 적중률 93%의 원천이라 줄이면 오히려 느려집니다.</li>
+  <li><strong><code>~/.lmstudio</code> 잔여 57GB</strong> — oMLX에 대응본이 없어 중복이 아닙니다. LM Studio를 안 쓰실 거면 정리 대상입니다.</li>
+  <li><strong><code>approvals.mode: smart</code></strong> — 여전히 모델 판단에 의존합니다. 확실히 막으려면 <code>always</code>로 두는 선택지가 있지만 확인 프롬프트가 늘어납니다.</li>
+  <li><strong>Figma MCP 토큰 만료(401)</strong> — 재발급 시 <code>config.yaml</code>이 아니라 <code>~/.hermes/.env</code>의 <code>FIGMA_TOKEN</code>에 넣으세요.</li>
+</ul>
+
+<footer>
+  Hermes Agent 최적화 리포트 · 2026-07-27 · MacBook Pro M5 Max 64GB<br>
+  근거: 세션 DB 42,340개 메시지 · oMLX 서버 실측 · <code>hermes-agent</code> 소스 확인<br>
+  관련 문서: <code>~/Projects/hermes-m5max-setup/README.md</code>
+</footer>
+
+</div>
+</body>
+</html>

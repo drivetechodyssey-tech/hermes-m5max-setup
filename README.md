@@ -380,11 +380,64 @@ curl -s http://127.0.0.1:8000/v1/models | python3 -m json.tool
 
 | 모델 | 크기 | 용도 |
 |------|------|------|
-| `Qwen3.6-35B-A3B-4bit` | 19GB | **메인** |
+| **`Qwen3.6-35B-A3B-4bit-DWQ`** | **19.3GB** | **메인** — 아래 비교 참고 |
+| `Qwen3.6-35B-A3B-4bit` | 19GB | 이전 메인, 롤백용 |
 | `Qwen3.6-35B-A3B-8bit` | 35GB | 품질 우선일 때 (단, 아래 참고) |
 | `gemma-4-12B-it-OptiQ-4bit` | - | 컨텍스트 압축용 보조 모델 |
 | `gemma-4-26b-a4b-it-4bit` | - | 범용 |
 | `mlx-community--Llama-3.2-3B-Instruct-4bit` | - | 초경량 |
+
+### 4bit vs 4bit-DWQ — 실측 비교 (2026-07-27)
+
+DWQ(Distilled Weight Quantization)는 양자화된 가중치가 원본 출력을 따라가도록
+**증류 학습**시킨 것입니다. 구조·크기·비트폭이 같으므로 연산량은 동일하고
+가중치 *값*만 개선됩니다. 2~4비트 구간에서만 효과가 크다고 알려져 있습니다.
+
+동일 조건(`turboquant_kv` 등 `model_settings.json` 전부 동일), 2회 독립 실행:
+
+| 항목 | 4bit | **4bit-DWQ** |
+|------|------|-------------|
+| 크기 | 19.0 GB | 19.3 GB |
+| 컨텍스트 | 262,144 | 262,144 |
+| 프리필 40K (교대측정 3쌍 중앙값) | 17.9s | 18.5s — **동일** |
+| 생성 속도 | 42.7~47.0 tok/s | 47.3~49.1 tok/s |
+| **tool call 정확도** | 5/6 (2회 모두) | **6/6 (2회 모두)** |
+| **완료 토큰 중앙값** | 695 | **287~320** |
+| **과제 완료 시간** | 52~64s | **31~36s** |
+
+4bit는 두 실행 모두 **같은 `web_search` 과제에서 1,839토큰을 쓰고도 도구를 호출하지
+못한 채 종료**했습니다(`finish_reason=stop`). 재현되는 결함입니다.
+
+DWQ가 과제를 45% 빨리 끝내는 이유는 생성 속도가 아니라 **reasoning 토큰을 2.2배
+덜 쓰기 때문**입니다. 에이전트에서는 이게 복리로 작용합니다 — 출력이 짧으면
+다음 턴에 프리필할 이력도 짧아집니다.
+
+> **벤치마크 함정 두 가지 (둘 다 실제로 겪음)**
+>
+> 1. **순서 효과** — 두 번째로 도는 모델이 항상 느립니다. 첫 측정에서 "DWQ 프리필
+>    2배 느림"이 나왔지만 순서를 뒤집으니 반대가 됐습니다. **반드시 교대 측정(A,B,A,B)**
+>    으로 드리프트를 상쇄하세요.
+> 2. **프롬프트 캐시** — 같은 텍스트를 재사용하면 91,385 tok/s 같은 허수가 나옵니다.
+>    매번 고유 텍스트를 쓰고 `usage.prompt_tokens_details.cached_tokens == 0`을
+>    확인해야 합니다. 랜덤 텍스트를 써도 적중하는 경우가 있으니 매 측정마다 확인하세요.
+
+### 롤백
+
+```bash
+hermes config set model.default Qwen3.6-35B-A3B-4bit
+hermes config set providers.omlx.default_model Qwen3.6-35B-A3B-4bit
+hermes gateway restart
+```
+
+### 새 모델을 추가했는데 목록에 안 보일 때
+
+oMLX는 **기동 시점에만** 모델을 탐색합니다. `omlx restart`가 "Successfully restarted"를
+출력해도 실제 프로세스는 안 바뀔 수 있으니(brew 서비스 레이블만 조작됨), 재탐색 API를
+쓰는 편이 확실합니다.
+
+```bash
+curl -s -X POST http://127.0.0.1:8000/admin/api/reload -H "Content-Type: application/json" -d '{}'
+```
 
 ### 4bit vs 8bit — 실측 비교 (2026-07-27)
 

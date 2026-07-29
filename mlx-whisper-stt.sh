@@ -21,6 +21,11 @@
 set -euo pipefail
 export HF_HUB_DISABLE_PROGRESS_BARS=1
 
+# launchd 로 뜨는 게이트웨이는 PATH 가 /usr/bin:/bin:/usr/sbin:/sbin 뿐이다.
+# mlx_whisper 는 오디오 디코딩에 ffmpeg(homebrew)를 서브프로세스로 부르므로
+# 여기서 PATH 를 직접 보장하지 않으면 FileNotFoundError: 'ffmpeg' 로 죽는다.
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 AUDIO="$1"
 LANG_CODE="${2:-ko}"
 

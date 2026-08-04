@@ -6,3 +6,12 @@ secrets/
 
 # Hermes internal
 .hermes/
+
+# 실험 원자료 — state.db에서 뽑은 실제 대화라 공개 저장소에 올리지 않는다.
+# 스크립트로 언제든 재생성된다 (extract_corpus.py).
+experiments/*/corpus/
+experiments/*/results/
+
+# 접두어형 env 파일 (.bluebot.env 같은 것이 .env 규칙에 안 걸린다)
+*.env
+.DS_Store

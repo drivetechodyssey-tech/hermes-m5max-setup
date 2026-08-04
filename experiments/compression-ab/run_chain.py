@@ -137,9 +137,19 @@ def ensure_only(model):
 # 세대 연쇄
 # ─────────────────────────────────────────────────────────────
 
-def make_compressor(context_length):
+def make_compressor(context_length, max_summary_tokens=None):
+    """압축기 인스턴스.
+
+    max_summary_tokens를 주면 코드 상수 천장(_SUMMARY_TOKENS_CEILING = 12,000)을
+    덮어쓴다. 요약 예산은 clamp(압축대상 × 0.20, 2000, max_summary_tokens)이므로
+    천장을 충분히 크게 잡으면 항상 압축대상의 1/5 = **압축률 5:1이 보장**된다.
+
+    threshold 비교 실험에서 이게 필요하다. threshold를 0.65로 올리면
+    압축 대상이 110,755가 되는데 예산이 12,000에 묶이면 9.2:1이 되어버려
+    "압축률은 동일하게"라는 조건이 깨진다.
+    """
     from agent.context_compressor import ContextCompressor
-    return ContextCompressor(
+    c = ContextCompressor(
         model=MAIN,
         threshold_percent=THRESHOLD,
         summary_target_ratio=TARGET_RATIO,
@@ -150,9 +160,12 @@ def make_compressor(context_length):
         config_context_length=context_length,
         quiet_mode=True,
     )
+    if max_summary_tokens:
+        c.max_summary_tokens = max_summary_tokens
+    return c
 
 
-def run_chain(corpus, condition, context_length, log):
+def run_chain(corpus, condition, context_length, log, max_summary_tokens=None):
     """한 조건으로 G1..Gn을 연쇄 압축한다.
 
     조건:
@@ -170,7 +183,7 @@ def run_chain(corpus, condition, context_length, log):
 
     summary_model = AUX if condition == "B" else MAIN
     thinking = False if condition == "A-off" else None
-    comp = make_compressor(context_length)
+    comp = make_compressor(context_length, max_summary_tokens)
 
     calls = []          # monkeypatch가 채우는 실제 호출 기록
 
@@ -267,6 +280,8 @@ def main():
     ap.add_argument("--context-length", type=int, default=CTX)
     ap.add_argument("--conditions", nargs="+", default=["A", "A-off", "B"])
     ap.add_argument("--skip-ceiling", action="store_true")
+    ap.add_argument("--max-summary-tokens", type=int, default=None,
+                    help="코드 상수 천장 12,000을 덮어쓴다. 크게 잡으면 압축률 5:1 고정")
     ap.add_argument("--out", default="results/track1.json")
     args = ap.parse_args()
 
@@ -296,7 +311,8 @@ def main():
                     "B": AUX}.get(cond, cond)
             log(f"\n  [조건 {cond}] 요약 모델 = {desc}")
             ensure_only(MAIN)          # 두 조건 모두 메인 상주 상태에서 출발
-            gens = run_chain(corpus, cond, args.context_length, log)
+            gens = run_chain(corpus, cond, args.context_length, log,
+                             args.max_summary_tokens)
 
             # 세대별 프로브 — 열화 곡선을 그리려면 매 세대 물어야 한다
             for rec in gens:
@@ -312,7 +328,7 @@ def main():
         if not args.skip_ceiling:
             log("\n  [ceiling] 무압축 원본 전체를 그대로 주고 같은 프로브")
             ensure_only(MAIN)
-            comp = make_compressor(args.context_length)
+            comp = make_compressor(args.context_length, args.max_summary_tokens)
             all_turns = [m for g in corpus["generations"] for m in g]
             raw = serialize_turns(comp, all_turns)
             results["runs"][cname]["ceiling"] = [{

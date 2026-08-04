@@ -15,3 +15,7 @@ experiments/*/results/
 # 접두어형 env 파일 (.bluebot.env 같은 것이 .env 규칙에 안 걸린다)
 *.env
 .DS_Store
+
+# 파이썬 캐시
+__pycache__/
+*.pyc

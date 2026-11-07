@@ -335,11 +335,24 @@ else
   # 기존 설정이 있으면 주요 필드만 업데이트
   log "config.yaml이 이미 존재합니다 — 프로필($PROFILE)에 맞게 주요 필드만 업데이트합니다"
 
-  # context_length 업데이트
-  sed -i '' "s/context_length: \d\+/context_length: ${HERMES_CTX}/" "$CONFIG_FILE" 2>/dev/null || true
+  # sed 로 YAML 을 고치면 macOS sed 문법(\d 미지원)이나 현재 값에 따라 조용히 아무것도 안 바뀐다.
+  # hermes config set 으로 정확한 키만 바꾼다. 없는 키에 set 하면 엉뚱한 구조가 생기므로
+  # (예: fallback_providers 목록 대신 '0': 키) 값이 있을 때만 바꾼다.
+  update_config_key() {  # $1 = 키, $2 = 새 값
+    local current
+    if ! current=$(hermes config get "$1" 2>/dev/null); then
+      warn "config.yaml에 $1 항목이 없어 건너뜁니다"
+    elif [[ "$current" == "$2" ]]; then
+      log "$1 = $2 (변경 없음)"
+    elif hermes config set "$1" "$2" >/dev/null 2>&1; then
+      log "$1: $current → $2"
+    else
+      warn "$1 업데이트 실패 — 'hermes config set $1 $2' 를 직접 실행하세요"
+    fi
+  }
 
-  # fallback model 업데이트
-  sed -i '' "s/model: llama-3.3-70b-versatile/model: ${FALLBACK_MODEL}/" "$CONFIG_FILE" 2>/dev/null || true
+  update_config_key model.context_length "$HERMES_CTX"
+  update_config_key fallback_providers.0.model "$FALLBACK_MODEL"
 fi
 
 # ── 체크포인트 7: API 키 설정 (대화형) ────────────────────────────────────

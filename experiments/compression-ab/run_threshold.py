@@ -240,8 +240,10 @@ def main():
     results = {"scale": SCALE, "runs": {}}
     t0 = time.time()
     for ci, cname in enumerate(args.corpus):
-        corpus = json.load(open(f"corpus/{cname}.json"))
-        probes = yaml.safe_load(open(f"probes/{cname}.yaml"))["probes"]
+        with open(f"corpus/{cname}.json") as f:
+            corpus = json.load(f)
+        with open(f"probes/{cname}.yaml") as f:
+            probes = yaml.safe_load(f)["probes"]
         all_messages = [m for g in corpus["generations"] for m in g]
         results["runs"][cname] = {}
 

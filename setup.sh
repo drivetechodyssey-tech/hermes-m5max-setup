@@ -20,7 +20,7 @@ err()      { echo -e "${RED}[✗]${NC} $*"; }
 section()  { echo -e "\n${BOLD}▶ $*${NC}"; }
 
 # ── RAM 메모리 크기 검출 ──────────────────────────────────────────────────
-section("0. 시스템 정보 검출")
+section "0. 시스템 정보 검출"
 
 if [[ "$(uname)" != "Darwin" ]]; then
   err "이 스크립트는 macOS (Apple Silicon) 전용입니다."
@@ -80,7 +80,7 @@ else
 fi
 
 # ── 체크포인트 1: Python 체크 ─────────────────────────────────────────────
-section("1. Python 3 확인")
+section "1. Python 3 확인"
 
 if ! command -v python3 &>/dev/null; then
   err "Python 3이 설치되어 있지 않습니다. (macOS 기본 Python 3.9+ 또는 pyenv 권장)"
@@ -91,7 +91,7 @@ PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_in
 log "Python 버전: $PYVER"
 
 # ── 체크포인트 2: Homebrew & 필수 도구 ────────────────────────────────────────
-section("2. Homebrew 및 필수 도구")
+section "2. Homebrew 및 필수 도구"
 
 if ! command -v brew &>/dev/null; then
   warn "Homebrew가 없습니다. 설치합니다..."
@@ -107,7 +107,7 @@ log "필수 도구: jq, yq"
 
 
 # ── 체크포인트 4: Ollama (Homebrew 전용) ──────────────────────────────────────
-section("4. Ollama 설치 및 컨텍스트 고정")
+section "4. Ollama 설치 및 컨텍스트 고정"
 
 if ! command -v ollama &>/dev/null; then
   warn "Ollama가 없습니다. Homebrew로 설치합니다..."
@@ -196,7 +196,7 @@ else
 fi
 
 # ── 체크포인트 5: Hermes Agent ────────────────────────────────────────────
-section("5. Hermes Agent 설치")
+section "5. Hermes Agent 설치"
 
 HERMES_HOME="$HOME/.hermes"
 HERMES_BIN="$HERMES_HOME/hermes-agent"
@@ -224,7 +224,7 @@ else
 fi
 
 # ── 체크포인트 7: config.yaml ────────────────────────────────────────────
-section("6. config.yaml 자동 생성")
+section "6. config.yaml 자동 생성"
 
 CONFIG_FILE="$HERMES_HOME/config.yaml"
 
@@ -326,7 +326,7 @@ else
 fi
 
 # ── 체크포인트 7: API 키 설정 (대화형) ────────────────────────────────────
-section("7. API 키 설정")
+section "7. API 키 설정"
 
 if ! grep -q "YOUR_GEMINI_API_KEY" "$CONFIG_FILE" 2>/dev/null; then
   log "API 키가 이미 설정되어 있음"
@@ -362,7 +362,7 @@ else
 fi
 
 # ── 체크포인트 7: MLX 가상환경 ────────────────────────────────────────────
-section("9. MLX 가상환경")
+section "9. MLX 가상환경"
 
 MLX_VENV="$HOME/mlx-env"
 
@@ -390,7 +390,7 @@ else
 fi
 
 # ── 체크포인트 8: 최종 정리 ────────────────────────────────────────────
-section("8. 설치 완료! — 다음 단계")
+section "8. 설치 완료! — 다음 단계"
 
 echo ""
 echo -e "${BOLD}═══ 설치가 완료되었습니다! ═══${NC}"

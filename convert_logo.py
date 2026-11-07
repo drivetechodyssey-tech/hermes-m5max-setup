@@ -1,5 +1,5 @@
+
 from PIL import Image
-import os
 
 input_path = "/Users/sungjunmaing/Projects/IMG_2305-removebg-preview.png"
 output_path = "/Users/sungjunmaing/Projects/hermes-m5max-setup/hero-logo-white.png"

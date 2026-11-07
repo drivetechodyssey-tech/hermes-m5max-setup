@@ -199,28 +199,34 @@ fi
 section "5. Hermes Agent 설치"
 
 HERMES_HOME="$HOME/.hermes"
-HERMES_BIN="$HERMES_HOME/hermes-agent"
 
 if command -v hermes &>/dev/null; then
   log "Hermes Agent 발견 ($(hermes --version 2>/dev/null || echo 'unknown'))"
 else
-  warn "Hermes Agent가 없습니다. 설치합니다..."
-  if command -v pip3 &>/dev/null; then
-    pip3 install hermes-agent 2>&1 | tail -3
-  else
-    python3 -m pip install hermes-agent 2>&1 | tail -3
+  warn "Hermes Agent가 없습니다. 공식 설치 스크립트로 설치합니다..."
+
+  # 공식 설치 스크립트는 config.yaml이 없으면 기본 예시로 만든다.
+  # 그대로 두면 6단계가 "이미 있음"으로 보고 프로필 맞춤 설정을 건너뛰므로,
+  # 설치 전에 없던 파일이면 설치 후 다른 이름으로 치워 둔다.
+  config_preexisted=false
+  [[ -f "$HERMES_HOME/config.yaml" ]] && config_preexisted=true
+
+  # --non-interactive: 대화형 설정 마법사 생략 (설정은 6단계에서 만든다)
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive
+
+  if [[ "$config_preexisted" == false && -f "$HERMES_HOME/config.yaml" ]]; then
+    mv "$HERMES_HOME/config.yaml" "$HERMES_HOME/config.yaml.installer-default"
+    log "설치 스크립트의 기본 config.yaml → config.yaml.installer-default 로 보관"
   fi
 
-  PATH_EXPORT='export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"'
-  if grep -q "hermes-agent" "$HOME/.zshrc" 2>/dev/null; then
-    log "PATH 이미 .zshrc에 설정됨"
+  # 설치 스크립트가 ~/.zshrc 에 ~/.local/bin 을 추가하지만, 이 셸에는 아직 반영되지 않는다
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v hermes &>/dev/null; then
+    log "Hermes Agent 설치 완료 ($(hermes --version 2>/dev/null || echo 'unknown'))"
   else
-    echo "" >> "$HOME/.zshrc"
-    echo "$PATH_EXPORT" >> "$HOME/.zshrc"
-    log "PATH 설정: .zshrc 추가 완료"
+    err "Hermes Agent 설치 후에도 hermes 명령을 찾을 수 없습니다. ~/.hermes/logs/install.log 를 확인하세요."
+    exit 1
   fi
-
-  log "Hermes Agent 설치 완료"
 fi
 
 # ── 체크포인트 7: config.yaml ────────────────────────────────────────────

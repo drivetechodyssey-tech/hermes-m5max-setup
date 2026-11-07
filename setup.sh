@@ -320,6 +320,17 @@ session_reset:
   at_hour: 4
 YAML
   log "config.yaml 생성 완료 — 프로필: $PROFILE (ctx=${HERMES_CTX})"
+
+  # 템플릿에는 설정 버전이 없어 Hermes가 구버전(0)으로 본다 → 최신 형식으로 맞춘다.
+  # (custom_providers 가 providers: 로 옮겨지고, 다른 값과 API 키 자리표시는 그대로 유지됨)
+  # 새 선택 키를 설정할지 묻는 질문은 stdin 을 막아 기본값(N)으로 넘긴다.
+  MIGRATE_LOG="$HERMES_HOME/logs/config-migrate.log"
+  mkdir -p "$(dirname "$MIGRATE_LOG")"
+  if hermes config migrate </dev/null >"$MIGRATE_LOG" 2>&1; then
+    log "config.yaml 최신 형식으로 마이그레이션 완료 ($(grep -m1 'Config version' "$MIGRATE_LOG" | sed 's/^ *//' || echo '버전 정보 없음'))"
+  else
+    warn "config.yaml 마이그레이션 실패 — 나중에 'hermes config migrate' 를 직접 실행하세요 (로그: $MIGRATE_LOG)"
+  fi
 else
   # 기존 설정이 있으면 주요 필드만 업데이트
   log "config.yaml이 이미 존재합니다 — 프로필($PROFILE)에 맞게 주요 필드만 업데이트합니다"

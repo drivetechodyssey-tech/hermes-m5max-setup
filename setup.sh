@@ -247,11 +247,11 @@ model:
 providers: {}
 
 custom_providers:
-   - name: gemini-free
+  - name: gemini-free
     base_url: https://generativelanguage.googleapis.com/v1beta/openai
     api_key: YOUR_GEMINI_API_KEY
     api_mode: chat_completions
-   - name: groq-free
+  - name: groq-free
     base_url: https://api.groq.com/openai/v1
     api_key: YOUR_GROQ_API_KEY
     api_mode: chat_completions
@@ -296,7 +296,7 @@ auxiliary:
     extra_body: {}
 
 fallback_providers:
-   - provider: custom
+  - provider: custom
     base_url: https://api.groq.com/openai/v1
     api_key: YOUR_GROQ_API_KEY
     model: ${FALLBACK_MODEL}
@@ -312,7 +312,7 @@ privacy:
   redact_secrets: true
 
 toolsets:
-   - hermes-cli
+  - hermes-cli
 
 session_reset:
   mode: both

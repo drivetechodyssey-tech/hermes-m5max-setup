@@ -66,7 +66,7 @@ def call(model, content, max_tokens=16):
             "ceiling": float(m.group(3)) if m else None,
             "body": body[:200],
         }
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — probe must report any failure, not crash
         return {"ok": False, "elapsed": time.time() - t0,
                 "status": type(e).__name__, "guard": False, "body": str(e)[:200]}
 

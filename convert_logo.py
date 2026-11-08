@@ -1,8 +1,21 @@
-from PIL import Image
-import os
 
-input_path = "/Users/sungjunmaing/Projects/IMG_2305-removebg-preview.png"
-output_path = "/Users/sungjunmaing/Projects/hermes-m5max-setup/hero-logo-white.png"
+import argparse
+from pathlib import Path
+
+from PIL import Image
+
+REPO_DIR = Path(__file__).resolve().parent
+
+parser = argparse.ArgumentParser(description="Convert the logo to a white version for dark headers.")
+parser.add_argument("input", nargs="?", type=Path,
+                    default=REPO_DIR / "img" / "IMG_2305-removebg-preview.png",
+                    help="source PNG (default: img/IMG_2305-removebg-preview.png)")
+parser.add_argument("output", nargs="?", type=Path,
+                    default=REPO_DIR / "hero-logo-white.png",
+                    help="output PNG (default: hero-logo-white.png in the repo root)")
+args = parser.parse_args()
+input_path = args.input
+output_path = args.output
 
 img = Image.open(input_path).convert("RGBA")
 print(f"Original size: {img.size}")

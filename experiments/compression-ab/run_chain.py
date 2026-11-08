@@ -294,8 +294,10 @@ def main():
     started = time.time()
 
     for ci, cname in enumerate(args.corpus):
-        corpus = json.load(open(f"corpus/{cname}.json"))
-        probes = yaml.safe_load(open(f"probes/{cname}.yaml"))["probes"]
+        with open(f"corpus/{cname}.json") as f:
+            corpus = json.load(f)
+        with open(f"probes/{cname}.yaml") as f:
+            probes = yaml.safe_load(f)["probes"]
         results["runs"][cname] = {}
 
         # 세대 연쇄는 조건 안에서 순차일 수밖에 없다(G2는 G1의 요약을 입력으로 쓴다).

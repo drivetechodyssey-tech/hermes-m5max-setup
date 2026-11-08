@@ -12,7 +12,10 @@
 서로 다른 주제가 이어져 대화로는 부자연스럽지만,
 압축 알고리즘 비교에는 문제되지 않는다 — 두 설정에 같은 입력이 들어간다.
 """
-import json, os, sqlite3, sys
+import json
+import os
+import sys
+
 sys.path.insert(0, os.path.expanduser("~/.hermes/hermes-agent"))
 from agent.model_metadata import estimate_messages_tokens_rough as est
 
@@ -40,9 +43,10 @@ for sid, note in ORDER:
     print(f"  {sid}  {len(part):3d}개 / 누적 {total:,} 토큰   {note}")
 
 os.makedirs("corpus", exist_ok=True)
-json.dump({"synthetic": True, "sections": marks, "total_tokens_rough": total,
-           "generations": [msgs]},
-          open("corpus/synth.json", "w"), ensure_ascii=False, indent=1)
+with open("corpus/synth.json", "w") as f:
+    json.dump({"synthetic": True, "sections": marks, "total_tokens_rough": total,
+               "generations": [msgs]},
+              f, ensure_ascii=False, indent=1)
 print(f"\n총 {len(msgs)}개 메시지 / {total:,} 토큰")
 print(f"T35 4회 압축 필요 234,883 → {'✓' if total >= 234883 else '✗ 부족'}")
 print(f"T65 4회 압축 필요 313,526 → {'✓' if total >= 313526 else '✗ 부족'}")

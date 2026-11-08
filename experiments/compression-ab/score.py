@@ -29,7 +29,7 @@ SECTIONS = [
 SECRET_RE = re.compile(r"\b(sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|"
                        r"AKIA[0-9A-Z]{16}|api[_-]?key\s*[:=]\s*[\"']?[A-Za-z0-9_\-]{20,})")
 PATH_RE = re.compile(r"(?:/Users/|~/)[\w./\-]{6,}")
-NUMBERED_RE = re.compile(r"^\s*(\d+)\.\s+\S", re.M)
+NUMBERED_RE = re.compile(r"^\s*(\d+)\.\s+\S", re.MULTILINE)
 
 
 # hermes가 요약 앞에 붙이는 고정 영어 프리픽스(_with_summary_prefix).
@@ -45,7 +45,7 @@ NUMBERED_RE = re.compile(r"^\s*(\d+)\.\s+\S", re.M)
 THINKING_RE = re.compile(
     r"(Here's a thinking process|I'll phrase it as|Let me (?:think|analyze|write)"
     r"|The user (?:said|wants|is asking)|I need to (?:write|update|preserve)"
-    r"|Okay, (?:let|so|the user))", re.I)
+    r"|Okay, (?:let|so|the user))", re.IGNORECASE)
 
 
 def strip_prefix(summary):
@@ -140,13 +140,16 @@ def main():
 
     import yaml
 
-    data = json.load(open(args.results))
+    with open(args.results) as f:
+        data = json.load(f)
     print(f"결과 파일: {args.results}  (context_length={data.get('context_length'):,})\n")
 
     for cname, conds in data["runs"].items():
-        probes = yaml.safe_load(open(f"probes/{cname}.yaml"))["probes"]
+        with open(f"probes/{cname}.yaml") as f:
+            probes = yaml.safe_load(f)["probes"]
         by_id = {p["id"]: p for p in probes}
-        corpus = json.load(open(f"corpus/{cname}.json"))
+        with open(f"corpus/{cname}.json") as f:
+            corpus = json.load(f)
         corpus_paths = set()
         for g in corpus["generations"]:
             for m in g:

@@ -20,7 +20,7 @@ err()      { echo -e "${RED}[✗]${NC} $*"; }
 section()  { echo -e "\n${BOLD}▶ $*${NC}"; }
 
 # ── RAM 메모리 크기 검출 ──────────────────────────────────────────────────
-section("0. 시스템 정보 검출")
+section "0. 시스템 정보 검출"
 
 if [[ "$(uname)" != "Darwin" ]]; then
   err "이 스크립트는 macOS (Apple Silicon) 전용입니다."
@@ -58,8 +58,8 @@ if [[ $TOTAL_RAM_GB -le 48 ]]; then
   FALLBACK_MODEL="llama-3.3-8b-instruct"
   warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32~48GB 기준)"
 
-elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
-       # 64GB: M5 Max
+elif [[ $TOTAL_RAM_GB -le 64 ]]; then
+       # 49~64GB: M5 Max (64GB 기준)
   PROFILE="max"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
   HERMES_CTX=131072
@@ -69,18 +69,25 @@ elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
   log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 64GB 기준, 약 83% 사용)"
 
 else
-      # 128GB: M3/M4 Max
+      # 64GB 초과 (96GB, 128GB 이상): M3/M4 Max — 128GB 기준
   PROFILE="max_ultra"
   HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
   HERMES_CTX=262144
   BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
   MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.1-70b-instruct"
-  log "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 128GB, 컨텍스트 최대)"
+  log "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 128GB 기준, 컨텍스트 최대)"
 fi
 
+# 프로필은 32/48/64/128GB 기준으로 맞춰져 있다. 그 외 용량은 구간으로 고른다:
+#   ~48GB → pro, 49~64GB → max, 64GB 초과 → max_ultra
+case "$TOTAL_RAM_GB" in
+  32|48|64|128) ;;
+  *) warn "${TOTAL_RAM_GB}GB 는 기준 용량(32/48/64/128GB)이 아니어서 구간에 따라 '$PROFILE' 프로필을 사용합니다. 필요하면 config.yaml 에서 조정하세요." ;;
+esac
+
 # ── 체크포인트 1: Python 체크 ─────────────────────────────────────────────
-section("1. Python 3 확인")
+section "1. Python 3 확인"
 
 if ! command -v python3 &>/dev/null; then
   err "Python 3이 설치되어 있지 않습니다. (macOS 기본 Python 3.9+ 또는 pyenv 권장)"
@@ -91,11 +98,22 @@ PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_in
 log "Python 버전: $PYVER"
 
 # ── 체크포인트 2: Homebrew & 필수 도구 ────────────────────────────────────────
-section("2. Homebrew 및 필수 도구")
+section "2. Homebrew 및 필수 도구"
 
 if ! command -v brew &>/dev/null; then
   warn "Homebrew가 없습니다. 설치합니다..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  # Apple Silicon 의 Homebrew 는 /opt/homebrew 에 설치되며, 설치 직후 이 셸의 PATH 에는 없다
+  for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [[ -x "$brew_bin" ]]; then
+      eval "$("$brew_bin" shellenv)"
+      break
+    fi
+  done
+  if ! command -v brew &>/dev/null; then
+    err "Homebrew 설치 후에도 brew 명령을 찾을 수 없습니다. 새 터미널에서 다시 실행하세요."
+    exit 1
+  fi
   log "Homebrew 설치 완료"
 else
   log "Homebrew 발견"
@@ -103,26 +121,60 @@ fi
 
 brew list jq >/dev/null 2>&1 || brew install jq
 brew list yq >/dev/null 2>&1 || brew install yq
-log "필수 도구: jq, yq"
+# ffmpeg: mlx-whisper 가 오디오를 디코딩할 때 서브프로세스로 부른다 (mlx-whisper-stt.sh)
+brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+log "필수 도구: jq, yq, ffmpeg"
 
 
-# ── 체크포인트 4: Ollama (Homebrew 전용) ──────────────────────────────────────
-section("4. Ollama 설치 및 컨텍스트 고정")
+# ── 체크포인트 3: Ollama (Homebrew 전용) ──────────────────────────────────────
+section "3. Ollama 설치 및 컨텍스트 고정"
 
 if ! command -v ollama &>/dev/null; then
   warn "Ollama가 없습니다. Homebrew로 설치합니다..."
-  brew install --cask ollama
+  # cask(앱)가 아니라 formula 로 설치한다 — brew services 는 formula 만 관리할 수 있다
+  brew install ollama
   log "Ollama 설치 완료 ($(ollama --version))"
 else
   log "Ollama 발견 ($(ollama --version))"
 fi
 
-# Ollama 서비스 시작 (brew services)
-if ! ollama health &>/dev/null; then
-  warn "Ollama가 실행 중이 아닙니다. brew services로 시작합니다..."
-  brew services start ollama
-  sleep 3
-  if ollama health &>/dev/null; then
+# ollama 에는 health 명령이 없다 → API 가 응답하는지로 실행 여부를 본다
+ollama_running() { curl -sf --max-time 2 http://127.0.0.1:11434/api/version >/dev/null; }
+
+wait_for_ollama() {  # 최대 15초 대기
+  local _
+  for _ in $(seq 1 15); do
+    ollama_running && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# Ollama 를 brew services 로 관리하는지 (formula 설치) 아니면 앱/직접 실행인지
+if brew list --formula ollama &>/dev/null; then
+  OLLAMA_VIA_BREW=true
+else
+  OLLAMA_VIA_BREW=false
+fi
+
+# Ollama 를 (다시) 시작한다. $1 = start | restart
+start_ollama() {
+  if [[ "$OLLAMA_VIA_BREW" == true ]]; then
+    brew services "$1" ollama
+  elif [[ -d /Applications/Ollama.app ]]; then
+    # 앱으로 설치된 경우: brew services 로는 다룰 수 없다
+    [[ "$1" == restart ]] && { osascript -e 'quit app "Ollama"' 2>/dev/null || true; sleep 2; }
+    open -a Ollama
+  else
+    warn "Ollama 를 자동으로 시작할 수 없습니다 — 'ollama serve'를 별도 터미널에서 실행하세요"
+    return 0
+  fi
+}
+
+if ! ollama_running; then
+  warn "Ollama가 실행 중이 아닙니다. 시작합니다..."
+  start_ollama start
+  if wait_for_ollama; then
     log "Ollama 서비스 시작됨"
   else
     warn "Ollama 서비스 시작 실패 — 'ollama serve'를 별도 터미널에서 실행하세요"
@@ -161,7 +213,10 @@ HERMES_LABEL="${HERMES_MODEL}-hermes"
 if ollama list | grep -q "$HERMES_LABEL"; then
   log "hermes용 레이블 '$HERMES_LABEL' 이미 존재"
   # 레이블이旧Modelfile로 생겼을 수 있으니 재생성
-  MODELF_CHECK=$(ollama show "$HERMES_LABEL" --modelfile 2>/dev/null | grep -oP 'num_ctx\s+\K\d+' || echo "0")
+  # macOS grep 은 -P 를 지원하지 않는다 → sed 로 "PARAMETER num_ctx <숫자>" 의 숫자를 뽑는다
+  MODELF_CHECK=$(ollama show "$HERMES_LABEL" --modelfile 2>/dev/null \
+    | sed -nE 's/^PARAMETER[[:space:]]+num_ctx[[:space:]]+([0-9]+).*/\1/p' | head -1 || true)
+  MODELF_CHECK="${MODELF_CHECK:-0}"
   if [[ "$MODELF_CHECK" != "$HERMES_CTX" ]]; then
     warn "기존 레이블 num_ctx($MODELF_CHECK)이 다름. 재생성합니다..."
     ollama rm "$HERMES_LABEL" 2>/dev/null || true
@@ -174,57 +229,91 @@ else
 fi
 
 # Ollama 환경변수 설정
-ollama_env_dir="$HOME/.ollama"
-ollama_env_file="$ollama_env_dir/env"
-if [[ ! -d "$ollama_env_dir" ]]; then
-  mkdir -p "$ollama_env_dir"
+# Ollama 는 ~/.ollama/env 같은 파일을 읽지 않는다. macOS 에서 launchd 로 뜨는 Ollama
+# (brew services / 앱) 에 환경변수를 주려면 launchctl setenv 를 써야 한다.
+# launchctl setenv 는 재부팅하면 사라지므로, 로그인할 때 다시 설정하고
+# Ollama 를 재시작하는 LaunchAgent 도 함께 설치한다.
+OLLAMA_ENV_KEEP_ALIVE="-1"
+OLLAMA_ENV_CONTEXT_LENGTH="${HERMES_CTX}"
+launchctl setenv OLLAMA_KEEP_ALIVE "$OLLAMA_ENV_KEEP_ALIVE"
+launchctl setenv OLLAMA_CONTEXT_LENGTH "$OLLAMA_ENV_CONTEXT_LENGTH"
+log "Ollama 환경변수 설정 (launchctl): OLLAMA_KEEP_ALIVE=$OLLAMA_ENV_KEEP_ALIVE, OLLAMA_CONTEXT_LENGTH=$OLLAMA_ENV_CONTEXT_LENGTH"
+
+# 로그인 시 재적용: 환경변수 설정 후 Ollama 재시작 (brew 서비스 이름은 버전에 따라 다르다)
+if [[ "$OLLAMA_VIA_BREW" == true ]]; then
+  OLLAMA_SERVICE_LABEL=$(brew services info ollama --json 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("service_name") or "")' 2>/dev/null || true)
+  OLLAMA_RESTART_CMD="launchctl kickstart -k gui/\$(id -u)/${OLLAMA_SERVICE_LABEL:-homebrew.mxcl.ollama}"
+else
+  OLLAMA_RESTART_CMD="osascript -e 'quit app \"Ollama\"'; sleep 2; open -a Ollama"
 fi
-cat << EOF > "$ollama_env_file"
-OLLAMA_KEEP_ALIVE=-1
-OLLAMA_CONTEXT_LENGTH=${HERMES_CTX}
+OLLAMA_ENV_AGENT="$HOME/Library/LaunchAgents/com.hermes-m5max-setup.ollama-env.plist"
+mkdir -p "$(dirname "$OLLAMA_ENV_AGENT")"
+cat << EOF > "$OLLAMA_ENV_AGENT"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hermes-m5max-setup.ollama-env</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>launchctl setenv OLLAMA_KEEP_ALIVE ${OLLAMA_ENV_KEEP_ALIVE}; launchctl setenv OLLAMA_CONTEXT_LENGTH ${OLLAMA_ENV_CONTEXT_LENGTH}; sleep 5; $(printf '%s' "$OLLAMA_RESTART_CMD" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
 EOF
-log "Ollama 환경변수 저장: $ollama_env_file"
+log "로그인 시 Ollama 환경변수 재적용 LaunchAgent: $OLLAMA_ENV_AGENT"
 
-# launchctl 재로드
-brew services restart ollama
-sleep 2
+# 환경변수를 반영하려면 Ollama 를 재시작해야 한다
+start_ollama restart
 
-if ollama health &>/dev/null; then
+if wait_for_ollama; then
   log "Ollama: 정상 작동 중"
 else
-  warn "Ollama가 즉시 응답하지 않음. 'ollama serve'를 별도 터미널에서 실행하세요."
+  warn "Ollama가 응답하지 않음. 'ollama serve'를 별도 터미널에서 실행하세요."
 fi
 
-# ── 체크포인트 5: Hermes Agent ────────────────────────────────────────────
-section("5. Hermes Agent 설치")
+# ── 체크포인트 4: Hermes Agent ────────────────────────────────────────────
+section "4. Hermes Agent 설치"
 
 HERMES_HOME="$HOME/.hermes"
-HERMES_BIN="$HERMES_HOME/hermes-agent"
 
 if command -v hermes &>/dev/null; then
   log "Hermes Agent 발견 ($(hermes --version 2>/dev/null || echo 'unknown'))"
 else
-  warn "Hermes Agent가 없습니다. 설치합니다..."
-  if command -v pip3 &>/dev/null; then
-    pip3 install hermes-agent 2>&1 | tail -3
-  else
-    python3 -m pip install hermes-agent 2>&1 | tail -3
+  warn "Hermes Agent가 없습니다. 공식 설치 스크립트로 설치합니다..."
+
+  # 공식 설치 스크립트는 config.yaml이 없으면 기본 예시로 만든다.
+  # 그대로 두면 5단계가 "이미 있음"으로 보고 프로필 맞춤 설정을 건너뛰므로,
+  # 설치 전에 없던 파일이면 설치 후 다른 이름으로 치워 둔다.
+  config_preexisted=false
+  [[ -f "$HERMES_HOME/config.yaml" ]] && config_preexisted=true
+
+  # --non-interactive: 대화형 설정 마법사 생략 (설정은 5단계에서 만든다)
+  curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive
+
+  if [[ "$config_preexisted" == false && -f "$HERMES_HOME/config.yaml" ]]; then
+    mv "$HERMES_HOME/config.yaml" "$HERMES_HOME/config.yaml.installer-default"
+    log "설치 스크립트의 기본 config.yaml → config.yaml.installer-default 로 보관"
   fi
 
-  PATH_EXPORT='export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"'
-  if grep -q "hermes-agent" "$HOME/.zshrc" 2>/dev/null; then
-    log "PATH 이미 .zshrc에 설정됨"
+  # 설치 스크립트가 ~/.zshrc 에 ~/.local/bin 을 추가하지만, 이 셸에는 아직 반영되지 않는다
+  export PATH="$HOME/.local/bin:$PATH"
+  if command -v hermes &>/dev/null; then
+    log "Hermes Agent 설치 완료 ($(hermes --version 2>/dev/null || echo 'unknown'))"
   else
-    echo "" >> "$HOME/.zshrc"
-    echo "$PATH_EXPORT" >> "$HOME/.zshrc"
-    log "PATH 설정: .zshrc 추가 완료"
+    err "Hermes Agent 설치 후에도 hermes 명령을 찾을 수 없습니다. ~/.hermes/logs/install.log 를 확인하세요."
+    exit 1
   fi
-
-  log "Hermes Agent 설치 완료"
 fi
 
-# ── 체크포인트 7: config.yaml ────────────────────────────────────────────
-section("6. config.yaml 자동 생성")
+# ── 체크포인트 5: config.yaml ────────────────────────────────────────────
+section "5. config.yaml 자동 생성"
 
 CONFIG_FILE="$HERMES_HOME/config.yaml"
 
@@ -241,11 +330,11 @@ model:
 providers: {}
 
 custom_providers:
-   - name: gemini-free
+  - name: gemini-free
     base_url: https://generativelanguage.googleapis.com/v1beta/openai
     api_key: YOUR_GEMINI_API_KEY
     api_mode: chat_completions
-   - name: groq-free
+  - name: groq-free
     base_url: https://api.groq.com/openai/v1
     api_key: YOUR_GROQ_API_KEY
     api_mode: chat_completions
@@ -290,7 +379,7 @@ auxiliary:
     extra_body: {}
 
 fallback_providers:
-   - provider: custom
+  - provider: custom
     base_url: https://api.groq.com/openai/v1
     api_key: YOUR_GROQ_API_KEY
     model: ${FALLBACK_MODEL}
@@ -306,7 +395,7 @@ privacy:
   redact_secrets: true
 
 toolsets:
-   - hermes-cli
+  - hermes-cli
 
 session_reset:
   mode: both
@@ -314,34 +403,64 @@ session_reset:
   at_hour: 4
 YAML
   log "config.yaml 생성 완료 — 프로필: $PROFILE (ctx=${HERMES_CTX})"
+
+  # 템플릿에는 설정 버전이 없어 Hermes가 구버전(0)으로 본다 → 최신 형식으로 맞춘다.
+  # (custom_providers 가 providers: 로 옮겨지고, 다른 값과 API 키 자리표시는 그대로 유지됨)
+  # 새 선택 키를 설정할지 묻는 질문은 stdin 을 막아 기본값(N)으로 넘긴다.
+  MIGRATE_LOG="$HERMES_HOME/logs/config-migrate.log"
+  mkdir -p "$(dirname "$MIGRATE_LOG")"
+  if hermes config migrate </dev/null >"$MIGRATE_LOG" 2>&1; then
+    log "config.yaml 최신 형식으로 마이그레이션 완료 ($(grep -m1 'Config version' "$MIGRATE_LOG" | sed 's/^ *//' || echo '버전 정보 없음'))"
+  else
+    warn "config.yaml 마이그레이션 실패 — 나중에 'hermes config migrate' 를 직접 실행하세요 (로그: $MIGRATE_LOG)"
+  fi
 else
   # 기존 설정이 있으면 주요 필드만 업데이트
   log "config.yaml이 이미 존재합니다 — 프로필($PROFILE)에 맞게 주요 필드만 업데이트합니다"
 
-  # context_length 업데이트
-  sed -i '' "s/context_length: \d\+/context_length: ${HERMES_CTX}/" "$CONFIG_FILE" 2>/dev/null || true
+  # sed 로 YAML 을 고치면 macOS sed 문법(\d 미지원)이나 현재 값에 따라 조용히 아무것도 안 바뀐다.
+  # hermes config set 으로 정확한 키만 바꾼다. 없는 키에 set 하면 엉뚱한 구조가 생기므로
+  # (예: fallback_providers 목록 대신 '0': 키) 값이 있을 때만 바꾼다.
+  update_config_key() {  # $1 = 키, $2 = 새 값
+    local current
+    if ! current=$(hermes config get "$1" 2>/dev/null); then
+      warn "config.yaml에 $1 항목이 없어 건너뜁니다"
+    elif [[ "$current" == "$2" ]]; then
+      log "$1 = $2 (변경 없음)"
+    elif hermes config set "$1" "$2" >/dev/null 2>&1; then
+      log "$1: $current → $2"
+    else
+      warn "$1 업데이트 실패 — 'hermes config set $1 $2' 를 직접 실행하세요"
+    fi
+  }
 
-  # fallback model 업데이트
-  sed -i '' "s/model: llama-3.3-70b-versatile/model: ${FALLBACK_MODEL}/" "$CONFIG_FILE" 2>/dev/null || true
+  update_config_key model.context_length "$HERMES_CTX"
+  update_config_key fallback_providers.0.model "$FALLBACK_MODEL"
 fi
 
-# ── 체크포인트 7: API 키 설정 (대화형) ────────────────────────────────────
-section("7. API 키 설정")
+# ── 체크포인트 6: API 키 설정 (대화형) ────────────────────────────────────
+section "6. API 키 설정"
 
 if ! grep -q "YOUR_GEMINI_API_KEY" "$CONFIG_FILE" 2>/dev/null; then
   log "API 키가 이미 설정되어 있음"
 else
   warn "아직 API 키가 설정되지 않았습니다."
+
+  # 입력한 키를 sed 치환에 그대로 넣으면 / & \ 가 섞인 키에서 치환이 깨진다 → 이스케이프
+  escape_sed_replacement() { printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'; }
+
   echo ""
   echo "아래 API 키들을 입력하세요 (엔터를 치면 건너뜁니다):"
   echo ""
   echo "  Gemini API 키:"
   echo "     → https://aistudio.google.com/app/apikey 에서 생성"
   echo ""
-  read -r -p "  Gemini API 키 > " GEMINI_KEY
+  # -s: 입력하는 키가 화면(과 화면 녹화·공유)에 남지 않게 한다
+  read -r -s -p "  Gemini API 키 > " GEMINI_KEY
+  echo ""
 
   if [[ -n "$GEMINI_KEY" && "$GEMINI_KEY" != "YOUR_GEMINI_API_KEY" ]]; then
-    sed -i '' "s/YOUR_GEMINI_API_KEY/$GEMINI_KEY/g" "$CONFIG_FILE"
+    sed -i '' "s/YOUR_GEMINI_API_KEY/$(escape_sed_replacement "$GEMINI_KEY")/g" "$CONFIG_FILE"
     log "Gemini API 키 설정 완료"
   else
     warn "Gemini API 키를 건너뜁니다 (~1500 req/일 무료 티어)"
@@ -351,10 +470,11 @@ else
   echo "  Groq API 키:"
   echo "     → https://console.groq.com/keys 에서 생성"
   echo ""
-  read -r -p "  Groq API 키 > " GROQ_KEY
+  read -r -s -p "  Groq API 키 > " GROQ_KEY
+  echo ""
 
   if [[ -n "$GROQ_KEY" && "$GROQ_KEY" != "YOUR_GROQ_API_KEY" ]]; then
-    sed -i '' "s/YOUR_GROQ_API_KEY/$GROQ_KEY/g" "$CONFIG_FILE"
+    sed -i '' "s/YOUR_GROQ_API_KEY/$(escape_sed_replacement "$GROQ_KEY")/g" "$CONFIG_FILE"
     log "Groq API 키 설정 완료"
   else
     warn "Groq API 키를 건너뜁니다 (~1000 req/일 무료 티어)"
@@ -362,35 +482,45 @@ else
 fi
 
 # ── 체크포인트 7: MLX 가상환경 ────────────────────────────────────────────
-section("9. MLX 가상환경")
+section "7. MLX 가상환경"
 
 MLX_VENV="$HOME/mlx-env"
+
+# mlx-lm: MLX 모델 실행, mlx-whisper: 음성 인식 (mlx-whisper-stt.sh 가 이 가상환경을 쓴다)
+# mlx-whisper 는 PyTorch 등을 함께 받아 처음 설치에 시간이 걸린다.
+MLX_PACKAGES=(mlx-lm mlx-whisper)
 
 if [[ ! -d "$MLX_VENV" ]]; then
   warn "MLX 가상환경이 없습니다. 생성합니다..."
   python3 -m venv "$MLX_VENV"
-  (
-    source "$MLX_VENV/bin/activate"
-    pip install mlx-lm 2>&1 | tail -2
-  )
   log "MLX 가상환경 생성: $MLX_VENV"
 else
   log "MLX 가상환경 이미 존재: $MLX_VENV"
 fi
 
-# 활성화 스크립트 추가
-SOURCE_CMD="source $MLX_VENV/bin/activate 2>/dev/null"
-if grep -q "mlx-env" "$HOME/.zshrc" 2>/dev/null; then
-  log "MLX activate 문이 .zshrc에 이미 있음"
+# 예전 버전으로 만든 가상환경에는 mlx-whisper 가 없으므로, 빠진 패키지만 설치한다
+MLX_MISSING=()
+"$MLX_VENV/bin/python3" -c "import mlx_lm" 2>/dev/null || MLX_MISSING+=(mlx-lm)
+"$MLX_VENV/bin/python3" -c "import mlx_whisper" 2>/dev/null || MLX_MISSING+=(mlx-whisper)
+if [[ ${#MLX_MISSING[@]} -gt 0 ]]; then
+  warn "MLX 패키지 설치: ${MLX_MISSING[*]} (몇 분 걸릴 수 있습니다)"
+  "$MLX_VENV/bin/pip" install "${MLX_MISSING[@]}" 2>&1 | tail -2
+  log "MLX 패키지 설치 완료: ${MLX_MISSING[*]}"
 else
-  echo "" >> "$HOME/.zshrc"
-  echo "# MLX 환경 (ollama MLX 모델 로딩용)" >> "$HOME/.zshrc"
-  echo "$SOURCE_CMD" >> "$HOME/.zshrc"
-  log "MLX venv activate를 .zshrc에 추가"
+  log "MLX 패키지 이미 설치됨: ${MLX_PACKAGES[*]}"
 fi
 
+# .zshrc 에서 자동 활성화하지 않는다: 그러면 모든 터미널의 python3/pip 가 이 가상환경 것으로
+# 바뀌고, Ollama 는 Python 가상환경이 필요 없다. 쓰는 쪽은 $MLX_VENV/bin/python3 를 직접 부른다.
+# 예전 버전이 .zshrc 에 넣은 줄은 사용자 파일이라 지우지 않고 안내만 한다.
+if grep -q "source $MLX_VENV/bin/activate" "$HOME/.zshrc" 2>/dev/null; then
+  warn ".zshrc 에 MLX 가상환경 자동 활성화 줄이 있습니다 (예전 setup.sh 가 추가)."
+  warn "  모든 터미널의 python3/pip 가 바뀌므로, 필요 없으면 이 줄을 지우세요: source $MLX_VENV/bin/activate"
+fi
+log "MLX 가상환경 사용: source $MLX_VENV/bin/activate (필요할 때만)"
+
 # ── 체크포인트 8: 최종 정리 ────────────────────────────────────────────
-section("8. 설치 완료! — 다음 단계")
+section "8. 설치 완료! — 다음 단계"
 
 echo ""
 echo -e "${BOLD}═══ 설치가 완료되었습니다! ═══${NC}"
@@ -410,7 +540,9 @@ echo -e "${BOLD}🔑 API 키 확인:${NC} nano ~/.hermes/config.yaml"
 echo ""
 
 # ── 검증 스크립트 생성 ──────────────────────────────────────────────────
-VSCRIPT_PATH="$HOME/Projects/hermes-m5max-setup/verify_setup.sh"
+# 저장소 위치에 상관없이 setup.sh 옆에 만든다 (curl | bash 로 실행하면 현재 폴더)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
+VSCRIPT_PATH="$SCRIPT_DIR/verify_setup.sh"
 cat << 'VERIFY_EOF' > "$VSCRIPT_PATH"
 #!/usr/bin/env bash
 # hermes-m5max-setup 검증 스크립트
@@ -445,7 +577,8 @@ echo ""
 
 # RAM 검출
 TOTAL_RAM_GB=$(( $(sysctl -n hw.memsize) / 1073741824 ))
-echo "  시스템: macOS, $TOTAL_RAM_GBGB ($CPU_MODEL)"
+CPU_MODEL=$(system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Chip/{print $2; exit}')
+echo "  시스템: macOS, ${TOTAL_RAM_GB}GB (${CPU_MODEL:-칩 정보 없음})"
 echo ""
 
 # 1. Python
@@ -455,7 +588,7 @@ check "python3 --version"
 check "command -v ollama"
 
 # 3. Ollama 서비스
-if ollama health &>/dev/null; then
+if curl -sf --max-time 2 http://127.0.0.1:11434/api/version >/dev/null; then
   ok "Ollama 서비스: 응답 중"
   CHECKS_PASSED=$((CHECKS_PASSED + 1))
 else
@@ -472,8 +605,9 @@ check "command -v hermes"
 # 6. config.yaml
 if [[ -f "$HOME/.hermes/config.yaml" ]]; then
   ok "config.yaml 존재"
-  CTX=$(grep "context_length:" "$HOME/.hermes/config.yaml" | head -1 | awk '{print $2}')
-  MAIN_MODEL=$(grep "default:" "$HOME/.hermes/config.yaml" | head -1 | awk '{print $2}')
+  # grep 으로 읽으면 주석 줄("# context_length: ...")을 먼저 잡는다 → hermes 로 정확한 키를 읽는다
+  CTX=$(hermes config get model.context_length 2>/dev/null || echo "설정 안 됨")
+  MAIN_MODEL=$(hermes config get model.default 2>/dev/null || echo "설정 안 됨")
   ok "config.yaml: 기본 모델=$MAIN_MODEL, ctx=$CTX"
   if grep -q "YOUR_GEMINI_API_KEY" "$HOME/.hermes/config.yaml"; then
     warn "Gemini API 키: 아직 설정 안됨"
@@ -497,8 +631,8 @@ else
 fi
 
 # 8. Modelfile num_ctx
-MODELF_CTX=$(cat "$HOME/Modelfile" 2>/dev/null | grep -oP 'num_ctx\s+\K\d+' || echo "0")
-if [[ "$MODELF_CTX" -gt 0 ]]; then
+MODELF_CTX=$(sed -nE 's/^PARAMETER[[:space:]]+num_ctx[[:space:]]+([0-9]+).*/\1/p' "$HOME/Modelfile" 2>/dev/null | head -1)
+if [[ "${MODELF_CTX:-0}" -gt 0 ]]; then
   ok "Modelfile num_ctx: $MODELF_CTX"
 else
   warn "Modelfile num_ctx: 검출 안됨"
@@ -519,5 +653,5 @@ chmod +x "$VSCRIPT_PATH"
 log "검증 스크립트 생성: $VSCRIPT_PATH"
 
 echo ""
-echo "  ▶ 검증 실행: bash ~/Projects/hermes-m5max-setup/verify_setup.sh"
+echo "  ▶ 검증 실행: bash $VSCRIPT_PATH"
 echo ""

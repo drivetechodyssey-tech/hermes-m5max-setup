@@ -119,7 +119,7 @@ ollama rm 모델명           # 모델 삭제
 
 ### PATH 설정
 ```bash
-echo 'export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 hermes
 ```
@@ -331,7 +331,7 @@ KeyError: '0 is not registered'
 ```
 → PATH 설정 후 재실행:
 ```bash
-echo 'export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"' >> ~/.zshrc
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 hermes
 ```

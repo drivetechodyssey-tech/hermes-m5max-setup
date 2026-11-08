@@ -59,7 +59,7 @@ hermes
 PATH가 안 걸려 있으면:
 
 ```bash
-export PATH="$HOME/.hermes/hermes-agent/venv/bin:$PATH"
+export PATH="$HOME/.local/bin:$PATH"
 ```
 
 > **Hermes가 먹통이면 십중팔구 oMLX가 안 떠 있는 것입니다.** `config.yaml`의 `providers.omlx.base_url`이 `127.0.0.1:8000`을 가리키는데 그 포트가 비어 있으면 모든 호출이 조용히 실패합니다. 위 `curl`부터 확인하세요.
@@ -489,7 +489,7 @@ stt:
   providers:
     mlx_whisper:
       type: command
-      command: /Users/sungjunmaing/Projects/hermes-m5max-setup/mlx-whisper-stt.sh {input_path} {language}
+      command: /path/to/hermes-m5max-setup/mlx-whisper-stt.sh {input_path} {language}  # 저장소의 실제 절대 경로로 바꾼다
       language: ko
       format: txt
 ```

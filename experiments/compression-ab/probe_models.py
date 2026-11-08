@@ -79,7 +79,7 @@ def check_prefill(model, label, tokens, seed):
         d, el = call(model, [{"role": "user", "content":
             f"아래는 무의미한 토큰 열이다. 읽고 'OK'만 답해라.\n\n{filler}"}],
             max_tokens=16)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001 — probe must report any failure, not crash
         print(f"  실패: {type(e).__name__} {e}")
         return None
     u = d.get("usage", {})

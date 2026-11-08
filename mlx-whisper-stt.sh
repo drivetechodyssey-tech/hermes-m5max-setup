@@ -29,7 +29,16 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 AUDIO="$1"
 LANG_CODE="${2:-ko}"
 
-exec /Users/sungjunmaing/mlx-env/bin/python3 - "$AUDIO" "$LANG_CODE" <<'EOF'
+# mlx-whisper 가 설치된 가상환경 (setup.sh 가 만드는 ~/mlx-env). 다른 곳이면 MLX_VENV 로 지정.
+MLX_PYTHON="${MLX_VENV:-$HOME/mlx-env}/bin/python3"
+if [[ ! -x "$MLX_PYTHON" ]]; then
+  # stdout 은 transcript 로 읽히므로 오류는 stderr 로만 낸다
+  echo "mlx-whisper-stt: $MLX_PYTHON 이 없습니다. 가상환경을 만들고 mlx-whisper 를 설치하세요:" >&2
+  echo "  python3 -m venv ~/mlx-env && ~/mlx-env/bin/pip install mlx-whisper" >&2
+  exit 1
+fi
+
+exec "$MLX_PYTHON" - "$AUDIO" "$LANG_CODE" <<'EOF'
 import sys
 import mlx_whisper
 

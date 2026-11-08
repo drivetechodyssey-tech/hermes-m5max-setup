@@ -489,7 +489,7 @@ stt:
   providers:
     mlx_whisper:
       type: command
-      command: /Users/sungjunmaing/Projects/hermes-m5max-setup/mlx-whisper-stt.sh {input_path} {language}
+      command: /path/to/hermes-m5max-setup/mlx-whisper-stt.sh {input_path} {language}  # 저장소의 실제 절대 경로로 바꾼다
       language: ko
       format: txt
 ```

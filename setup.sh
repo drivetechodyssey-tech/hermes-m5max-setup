@@ -96,6 +96,17 @@ section "2. Homebrew 및 필수 도구"
 if ! command -v brew &>/dev/null; then
   warn "Homebrew가 없습니다. 설치합니다..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+  # Apple Silicon 의 Homebrew 는 /opt/homebrew 에 설치되며, 설치 직후 이 셸의 PATH 에는 없다
+  for brew_bin in /opt/homebrew/bin/brew /usr/local/bin/brew; do
+    if [[ -x "$brew_bin" ]]; then
+      eval "$("$brew_bin" shellenv)"
+      break
+    fi
+  done
+  if ! command -v brew &>/dev/null; then
+    err "Homebrew 설치 후에도 brew 명령을 찾을 수 없습니다. 새 터미널에서 다시 실행하세요."
+    exit 1
+  fi
   log "Homebrew 설치 완료"
 else
   log "Homebrew 발견"
@@ -111,18 +122,50 @@ section "4. Ollama 설치 및 컨텍스트 고정"
 
 if ! command -v ollama &>/dev/null; then
   warn "Ollama가 없습니다. Homebrew로 설치합니다..."
-  brew install --cask ollama
+  # cask(앱)가 아니라 formula 로 설치한다 — brew services 는 formula 만 관리할 수 있다
+  brew install ollama
   log "Ollama 설치 완료 ($(ollama --version))"
 else
   log "Ollama 발견 ($(ollama --version))"
 fi
 
-# Ollama 서비스 시작 (brew services)
-if ! ollama health &>/dev/null; then
-  warn "Ollama가 실행 중이 아닙니다. brew services로 시작합니다..."
-  brew services start ollama
-  sleep 3
-  if ollama health &>/dev/null; then
+# ollama 에는 health 명령이 없다 → API 가 응답하는지로 실행 여부를 본다
+ollama_running() { curl -sf --max-time 2 http://127.0.0.1:11434/api/version >/dev/null; }
+
+wait_for_ollama() {  # 최대 15초 대기
+  local _
+  for _ in $(seq 1 15); do
+    ollama_running && return 0
+    sleep 1
+  done
+  return 1
+}
+
+# Ollama 를 brew services 로 관리하는지 (formula 설치) 아니면 앱/직접 실행인지
+if brew list --formula ollama &>/dev/null; then
+  OLLAMA_VIA_BREW=true
+else
+  OLLAMA_VIA_BREW=false
+fi
+
+# Ollama 를 (다시) 시작한다. $1 = start | restart
+start_ollama() {
+  if [[ "$OLLAMA_VIA_BREW" == true ]]; then
+    brew services "$1" ollama
+  elif [[ -d /Applications/Ollama.app ]]; then
+    # 앱으로 설치된 경우: brew services 로는 다룰 수 없다
+    [[ "$1" == restart ]] && { osascript -e 'quit app "Ollama"' 2>/dev/null || true; sleep 2; }
+    open -a Ollama
+  else
+    warn "Ollama 를 자동으로 시작할 수 없습니다 — 'ollama serve'를 별도 터미널에서 실행하세요"
+    return 0
+  fi
+}
+
+if ! ollama_running; then
+  warn "Ollama가 실행 중이 아닙니다. 시작합니다..."
+  start_ollama start
+  if wait_for_ollama; then
     log "Ollama 서비스 시작됨"
   else
     warn "Ollama 서비스 시작 실패 — 'ollama serve'를 별도 터미널에서 실행하세요"
@@ -161,7 +204,10 @@ HERMES_LABEL="${HERMES_MODEL}-hermes"
 if ollama list | grep -q "$HERMES_LABEL"; then
   log "hermes용 레이블 '$HERMES_LABEL' 이미 존재"
   # 레이블이旧Modelfile로 생겼을 수 있으니 재생성
-  MODELF_CHECK=$(ollama show "$HERMES_LABEL" --modelfile 2>/dev/null | grep -oP 'num_ctx\s+\K\d+' || echo "0")
+  # macOS grep 은 -P 를 지원하지 않는다 → sed 로 "PARAMETER num_ctx <숫자>" 의 숫자를 뽑는다
+  MODELF_CHECK=$(ollama show "$HERMES_LABEL" --modelfile 2>/dev/null \
+    | sed -nE 's/^PARAMETER[[:space:]]+num_ctx[[:space:]]+([0-9]+).*/\1/p' | head -1 || true)
+  MODELF_CHECK="${MODELF_CHECK:-0}"
   if [[ "$MODELF_CHECK" != "$HERMES_CTX" ]]; then
     warn "기존 레이블 num_ctx($MODELF_CHECK)이 다름. 재생성합니다..."
     ollama rm "$HERMES_LABEL" 2>/dev/null || true
@@ -174,25 +220,53 @@ else
 fi
 
 # Ollama 환경변수 설정
-ollama_env_dir="$HOME/.ollama"
-ollama_env_file="$ollama_env_dir/env"
-if [[ ! -d "$ollama_env_dir" ]]; then
-  mkdir -p "$ollama_env_dir"
+# Ollama 는 ~/.ollama/env 같은 파일을 읽지 않는다. macOS 에서 launchd 로 뜨는 Ollama
+# (brew services / 앱) 에 환경변수를 주려면 launchctl setenv 를 써야 한다.
+# launchctl setenv 는 재부팅하면 사라지므로, 로그인할 때 다시 설정하고
+# Ollama 를 재시작하는 LaunchAgent 도 함께 설치한다.
+OLLAMA_ENV_KEEP_ALIVE="-1"
+OLLAMA_ENV_CONTEXT_LENGTH="${HERMES_CTX}"
+launchctl setenv OLLAMA_KEEP_ALIVE "$OLLAMA_ENV_KEEP_ALIVE"
+launchctl setenv OLLAMA_CONTEXT_LENGTH "$OLLAMA_ENV_CONTEXT_LENGTH"
+log "Ollama 환경변수 설정 (launchctl): OLLAMA_KEEP_ALIVE=$OLLAMA_ENV_KEEP_ALIVE, OLLAMA_CONTEXT_LENGTH=$OLLAMA_ENV_CONTEXT_LENGTH"
+
+# 로그인 시 재적용: 환경변수 설정 후 Ollama 재시작 (brew 서비스 이름은 버전에 따라 다르다)
+if [[ "$OLLAMA_VIA_BREW" == true ]]; then
+  OLLAMA_SERVICE_LABEL=$(brew services info ollama --json 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)[0].get("service_name") or "")' 2>/dev/null || true)
+  OLLAMA_RESTART_CMD="launchctl kickstart -k gui/\$(id -u)/${OLLAMA_SERVICE_LABEL:-homebrew.mxcl.ollama}"
+else
+  OLLAMA_RESTART_CMD="osascript -e 'quit app \"Ollama\"'; sleep 2; open -a Ollama"
 fi
-cat << EOF > "$ollama_env_file"
-OLLAMA_KEEP_ALIVE=-1
-OLLAMA_CONTEXT_LENGTH=${HERMES_CTX}
+OLLAMA_ENV_AGENT="$HOME/Library/LaunchAgents/com.hermes-m5max-setup.ollama-env.plist"
+mkdir -p "$(dirname "$OLLAMA_ENV_AGENT")"
+cat << EOF > "$OLLAMA_ENV_AGENT"
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.hermes-m5max-setup.ollama-env</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/sh</string>
+    <string>-c</string>
+    <string>launchctl setenv OLLAMA_KEEP_ALIVE ${OLLAMA_ENV_KEEP_ALIVE}; launchctl setenv OLLAMA_CONTEXT_LENGTH ${OLLAMA_ENV_CONTEXT_LENGTH}; sleep 5; $(printf '%s' "$OLLAMA_RESTART_CMD" | sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g')</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+</dict>
+</plist>
 EOF
-log "Ollama 환경변수 저장: $ollama_env_file"
+log "로그인 시 Ollama 환경변수 재적용 LaunchAgent: $OLLAMA_ENV_AGENT"
 
-# launchctl 재로드
-brew services restart ollama
-sleep 2
+# 환경변수를 반영하려면 Ollama 를 재시작해야 한다
+start_ollama restart
 
-if ollama health &>/dev/null; then
+if wait_for_ollama; then
   log "Ollama: 정상 작동 중"
 else
-  warn "Ollama가 즉시 응답하지 않음. 'ollama serve'를 별도 터미널에서 실행하세요."
+  warn "Ollama가 응답하지 않음. 'ollama serve'를 별도 터미널에서 실행하세요."
 fi
 
 # ── 체크포인트 5: Hermes Agent ────────────────────────────────────────────
@@ -440,7 +514,9 @@ echo -e "${BOLD}🔑 API 키 확인:${NC} nano ~/.hermes/config.yaml"
 echo ""
 
 # ── 검증 스크립트 생성 ──────────────────────────────────────────────────
-VSCRIPT_PATH="$HOME/Projects/hermes-m5max-setup/verify_setup.sh"
+# 저장소 위치에 상관없이 setup.sh 옆에 만든다 (curl | bash 로 실행하면 현재 폴더)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-.}")" && pwd)"
+VSCRIPT_PATH="$SCRIPT_DIR/verify_setup.sh"
 cat << 'VERIFY_EOF' > "$VSCRIPT_PATH"
 #!/usr/bin/env bash
 # hermes-m5max-setup 검증 스크립트
@@ -475,7 +551,8 @@ echo ""
 
 # RAM 검출
 TOTAL_RAM_GB=$(( $(sysctl -n hw.memsize) / 1073741824 ))
-echo "  시스템: macOS, $TOTAL_RAM_GBGB ($CPU_MODEL)"
+CPU_MODEL=$(system_profiler SPHardwareDataType 2>/dev/null | awk -F': ' '/Chip/{print $2; exit}')
+echo "  시스템: macOS, ${TOTAL_RAM_GB}GB (${CPU_MODEL:-칩 정보 없음})"
 echo ""
 
 # 1. Python
@@ -485,7 +562,7 @@ check "python3 --version"
 check "command -v ollama"
 
 # 3. Ollama 서비스
-if ollama health &>/dev/null; then
+if curl -sf --max-time 2 http://127.0.0.1:11434/api/version >/dev/null; then
   ok "Ollama 서비스: 응답 중"
   CHECKS_PASSED=$((CHECKS_PASSED + 1))
 else
@@ -502,8 +579,9 @@ check "command -v hermes"
 # 6. config.yaml
 if [[ -f "$HOME/.hermes/config.yaml" ]]; then
   ok "config.yaml 존재"
-  CTX=$(grep "context_length:" "$HOME/.hermes/config.yaml" | head -1 | awk '{print $2}')
-  MAIN_MODEL=$(grep "default:" "$HOME/.hermes/config.yaml" | head -1 | awk '{print $2}')
+  # grep 으로 읽으면 주석 줄("# context_length: ...")을 먼저 잡는다 → hermes 로 정확한 키를 읽는다
+  CTX=$(hermes config get model.context_length 2>/dev/null || echo "설정 안 됨")
+  MAIN_MODEL=$(hermes config get model.default 2>/dev/null || echo "설정 안 됨")
   ok "config.yaml: 기본 모델=$MAIN_MODEL, ctx=$CTX"
   if grep -q "YOUR_GEMINI_API_KEY" "$HOME/.hermes/config.yaml"; then
     warn "Gemini API 키: 아직 설정 안됨"
@@ -527,8 +605,8 @@ else
 fi
 
 # 8. Modelfile num_ctx
-MODELF_CTX=$(cat "$HOME/Modelfile" 2>/dev/null | grep -oP 'num_ctx\s+\K\d+' || echo "0")
-if [[ "$MODELF_CTX" -gt 0 ]]; then
+MODELF_CTX=$(sed -nE 's/^PARAMETER[[:space:]]+num_ctx[[:space:]]+([0-9]+).*/\1/p' "$HOME/Modelfile" 2>/dev/null | head -1)
+if [[ "${MODELF_CTX:-0}" -gt 0 ]]; then
   ok "Modelfile num_ctx: $MODELF_CTX"
 else
   warn "Modelfile num_ctx: 검출 안됨"
@@ -549,5 +627,5 @@ chmod +x "$VSCRIPT_PATH"
 log "검증 스크립트 생성: $VSCRIPT_PATH"
 
 echo ""
-echo "  ▶ 검증 실행: bash ~/Projects/hermes-m5max-setup/verify_setup.sh"
+echo "  ▶ 검증 실행: bash $VSCRIPT_PATH"
 echo ""

@@ -121,7 +121,9 @@ fi
 
 brew list jq >/dev/null 2>&1 || brew install jq
 brew list yq >/dev/null 2>&1 || brew install yq
-log "필수 도구: jq, yq"
+# ffmpeg: mlx-whisper 가 오디오를 디코딩할 때 서브프로세스로 부른다 (mlx-whisper-stt.sh)
+brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
+log "필수 도구: jq, yq, ffmpeg"
 
 
 # ── 체크포인트 3: Ollama (Homebrew 전용) ──────────────────────────────────────
@@ -484,16 +486,28 @@ section "7. MLX 가상환경"
 
 MLX_VENV="$HOME/mlx-env"
 
+# mlx-lm: MLX 모델 실행, mlx-whisper: 음성 인식 (mlx-whisper-stt.sh 가 이 가상환경을 쓴다)
+# mlx-whisper 는 PyTorch 등을 함께 받아 처음 설치에 시간이 걸린다.
+MLX_PACKAGES=(mlx-lm mlx-whisper)
+
 if [[ ! -d "$MLX_VENV" ]]; then
   warn "MLX 가상환경이 없습니다. 생성합니다..."
   python3 -m venv "$MLX_VENV"
-  (
-    source "$MLX_VENV/bin/activate"
-    pip install mlx-lm 2>&1 | tail -2
-  )
   log "MLX 가상환경 생성: $MLX_VENV"
 else
   log "MLX 가상환경 이미 존재: $MLX_VENV"
+fi
+
+# 예전 버전으로 만든 가상환경에는 mlx-whisper 가 없으므로, 빠진 패키지만 설치한다
+MLX_MISSING=()
+"$MLX_VENV/bin/python3" -c "import mlx_lm" 2>/dev/null || MLX_MISSING+=(mlx-lm)
+"$MLX_VENV/bin/python3" -c "import mlx_whisper" 2>/dev/null || MLX_MISSING+=(mlx-whisper)
+if [[ ${#MLX_MISSING[@]} -gt 0 ]]; then
+  warn "MLX 패키지 설치: ${MLX_MISSING[*]} (몇 분 걸릴 수 있습니다)"
+  "$MLX_VENV/bin/pip" install "${MLX_MISSING[@]}" 2>&1 | tail -2
+  log "MLX 패키지 설치 완료: ${MLX_MISSING[*]}"
+else
+  log "MLX 패키지 이미 설치됨: ${MLX_PACKAGES[*]}"
 fi
 
 # .zshrc 에서 자동 활성화하지 않는다: 그러면 모든 터미널의 python3/pip 가 이 가상환경 것으로

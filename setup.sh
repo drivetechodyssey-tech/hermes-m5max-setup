@@ -58,8 +58,8 @@ if [[ $TOTAL_RAM_GB -le 48 ]]; then
   FALLBACK_MODEL="llama-3.3-8b-instruct"
   warn "중용량 프로필: ${HERMES_MODEL} 4-bit (ctx=${HERMES_CTX} — 32~48GB 기준)"
 
-elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
-       # 64GB: M5 Max
+elif [[ $TOTAL_RAM_GB -le 64 ]]; then
+       # 49~64GB: M5 Max (64GB 기준)
   PROFILE="max"
   HERMES_MODEL="qwen3.6:35b-a3b-coding-mxfp8"
   HERMES_CTX=131072
@@ -69,15 +69,22 @@ elif [[ $TOTAL_RAM_GB -eq 64 ]]; then
   log "최적 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 64GB 기준, 약 83% 사용)"
 
 else
-      # 128GB: M3/M4 Max
+      # 64GB 초과 (96GB, 128GB 이상): M3/M4 Max — 128GB 기준
   PROFILE="max_ultra"
   HERMES_MODEL="qwen3.6:27b-coding-nvfp4"
   HERMES_CTX=262144
   BACKUP_MODEL="qwen3.6:27b-coding-nvfp4"
   MCP_MODEL="qwen3.6:27b-coding-nvfp4"
   FALLBACK_MODEL="llama-3.1-70b-instruct"
-  log "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 128GB, 컨텍스트 최대)"
+  log "최대 프로필: ${HERMES_MODEL} (ctx=${HERMES_CTX} — 128GB 기준, 컨텍스트 최대)"
 fi
+
+# 프로필은 32/48/64/128GB 기준으로 맞춰져 있다. 그 외 용량은 구간으로 고른다:
+#   ~48GB → pro, 49~64GB → max, 64GB 초과 → max_ultra
+case "$TOTAL_RAM_GB" in
+  32|48|64|128) ;;
+  *) warn "${TOTAL_RAM_GB}GB 는 기준 용량(32/48/64/128GB)이 아니어서 구간에 따라 '$PROFILE' 프로필을 사용합니다. 필요하면 config.yaml 에서 조정하세요." ;;
+esac
 
 # ── 체크포인트 1: Python 체크 ─────────────────────────────────────────────
 section "1. Python 3 확인"
@@ -117,8 +124,8 @@ brew list yq >/dev/null 2>&1 || brew install yq
 log "필수 도구: jq, yq"
 
 
-# ── 체크포인트 4: Ollama (Homebrew 전용) ──────────────────────────────────────
-section "4. Ollama 설치 및 컨텍스트 고정"
+# ── 체크포인트 3: Ollama (Homebrew 전용) ──────────────────────────────────────
+section "3. Ollama 설치 및 컨텍스트 고정"
 
 if ! command -v ollama &>/dev/null; then
   warn "Ollama가 없습니다. Homebrew로 설치합니다..."
@@ -269,8 +276,8 @@ else
   warn "Ollama가 응답하지 않음. 'ollama serve'를 별도 터미널에서 실행하세요."
 fi
 
-# ── 체크포인트 5: Hermes Agent ────────────────────────────────────────────
-section "5. Hermes Agent 설치"
+# ── 체크포인트 4: Hermes Agent ────────────────────────────────────────────
+section "4. Hermes Agent 설치"
 
 HERMES_HOME="$HOME/.hermes"
 
@@ -280,12 +287,12 @@ else
   warn "Hermes Agent가 없습니다. 공식 설치 스크립트로 설치합니다..."
 
   # 공식 설치 스크립트는 config.yaml이 없으면 기본 예시로 만든다.
-  # 그대로 두면 6단계가 "이미 있음"으로 보고 프로필 맞춤 설정을 건너뛰므로,
+  # 그대로 두면 5단계가 "이미 있음"으로 보고 프로필 맞춤 설정을 건너뛰므로,
   # 설치 전에 없던 파일이면 설치 후 다른 이름으로 치워 둔다.
   config_preexisted=false
   [[ -f "$HERMES_HOME/config.yaml" ]] && config_preexisted=true
 
-  # --non-interactive: 대화형 설정 마법사 생략 (설정은 6단계에서 만든다)
+  # --non-interactive: 대화형 설정 마법사 생략 (설정은 5단계에서 만든다)
   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --non-interactive
 
   if [[ "$config_preexisted" == false && -f "$HERMES_HOME/config.yaml" ]]; then
@@ -303,8 +310,8 @@ else
   fi
 fi
 
-# ── 체크포인트 7: config.yaml ────────────────────────────────────────────
-section "6. config.yaml 자동 생성"
+# ── 체크포인트 5: config.yaml ────────────────────────────────────────────
+section "5. config.yaml 자동 생성"
 
 CONFIG_FILE="$HERMES_HOME/config.yaml"
 
@@ -429,23 +436,29 @@ else
   update_config_key fallback_providers.0.model "$FALLBACK_MODEL"
 fi
 
-# ── 체크포인트 7: API 키 설정 (대화형) ────────────────────────────────────
-section "7. API 키 설정"
+# ── 체크포인트 6: API 키 설정 (대화형) ────────────────────────────────────
+section "6. API 키 설정"
 
 if ! grep -q "YOUR_GEMINI_API_KEY" "$CONFIG_FILE" 2>/dev/null; then
   log "API 키가 이미 설정되어 있음"
 else
   warn "아직 API 키가 설정되지 않았습니다."
+
+  # 입력한 키를 sed 치환에 그대로 넣으면 / & \ 가 섞인 키에서 치환이 깨진다 → 이스케이프
+  escape_sed_replacement() { printf '%s' "$1" | sed -e 's/[\/&]/\\&/g'; }
+
   echo ""
   echo "아래 API 키들을 입력하세요 (엔터를 치면 건너뜁니다):"
   echo ""
   echo "  Gemini API 키:"
   echo "     → https://aistudio.google.com/app/apikey 에서 생성"
   echo ""
-  read -r -p "  Gemini API 키 > " GEMINI_KEY
+  # -s: 입력하는 키가 화면(과 화면 녹화·공유)에 남지 않게 한다
+  read -r -s -p "  Gemini API 키 > " GEMINI_KEY
+  echo ""
 
   if [[ -n "$GEMINI_KEY" && "$GEMINI_KEY" != "YOUR_GEMINI_API_KEY" ]]; then
-    sed -i '' "s/YOUR_GEMINI_API_KEY/$GEMINI_KEY/g" "$CONFIG_FILE"
+    sed -i '' "s/YOUR_GEMINI_API_KEY/$(escape_sed_replacement "$GEMINI_KEY")/g" "$CONFIG_FILE"
     log "Gemini API 키 설정 완료"
   else
     warn "Gemini API 키를 건너뜁니다 (~1500 req/일 무료 티어)"
@@ -455,10 +468,11 @@ else
   echo "  Groq API 키:"
   echo "     → https://console.groq.com/keys 에서 생성"
   echo ""
-  read -r -p "  Groq API 키 > " GROQ_KEY
+  read -r -s -p "  Groq API 키 > " GROQ_KEY
+  echo ""
 
   if [[ -n "$GROQ_KEY" && "$GROQ_KEY" != "YOUR_GROQ_API_KEY" ]]; then
-    sed -i '' "s/YOUR_GROQ_API_KEY/$GROQ_KEY/g" "$CONFIG_FILE"
+    sed -i '' "s/YOUR_GROQ_API_KEY/$(escape_sed_replacement "$GROQ_KEY")/g" "$CONFIG_FILE"
     log "Groq API 키 설정 완료"
   else
     warn "Groq API 키를 건너뜁니다 (~1000 req/일 무료 티어)"
@@ -466,7 +480,7 @@ else
 fi
 
 # ── 체크포인트 7: MLX 가상환경 ────────────────────────────────────────────
-section "9. MLX 가상환경"
+section "7. MLX 가상환경"
 
 MLX_VENV="$HOME/mlx-env"
 
@@ -482,16 +496,14 @@ else
   log "MLX 가상환경 이미 존재: $MLX_VENV"
 fi
 
-# 활성화 스크립트 추가
-SOURCE_CMD="source $MLX_VENV/bin/activate 2>/dev/null"
-if grep -q "mlx-env" "$HOME/.zshrc" 2>/dev/null; then
-  log "MLX activate 문이 .zshrc에 이미 있음"
-else
-  echo "" >> "$HOME/.zshrc"
-  echo "# MLX 환경 (ollama MLX 모델 로딩용)" >> "$HOME/.zshrc"
-  echo "$SOURCE_CMD" >> "$HOME/.zshrc"
-  log "MLX venv activate를 .zshrc에 추가"
+# .zshrc 에서 자동 활성화하지 않는다: 그러면 모든 터미널의 python3/pip 가 이 가상환경 것으로
+# 바뀌고, Ollama 는 Python 가상환경이 필요 없다. 쓰는 쪽은 $MLX_VENV/bin/python3 를 직접 부른다.
+# 예전 버전이 .zshrc 에 넣은 줄은 사용자 파일이라 지우지 않고 안내만 한다.
+if grep -q "source $MLX_VENV/bin/activate" "$HOME/.zshrc" 2>/dev/null; then
+  warn ".zshrc 에 MLX 가상환경 자동 활성화 줄이 있습니다 (예전 setup.sh 가 추가)."
+  warn "  모든 터미널의 python3/pip 가 바뀌므로, 필요 없으면 이 줄을 지우세요: source $MLX_VENV/bin/activate"
 fi
+log "MLX 가상환경 사용: source $MLX_VENV/bin/activate (필요할 때만)"
 
 # ── 체크포인트 8: 최종 정리 ────────────────────────────────────────────
 section "8. 설치 완료! — 다음 단계"
